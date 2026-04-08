@@ -25,3 +25,8 @@ Streamlit로 구현하지만, 실제 모바일 은행 앱처럼 보이는 세로
 - 최하단에는 가상 키보드(숫자) 표시 (키보드 위에는 파란색 전송 버튼이 있음, width는 키보드와 같은 디자인)
 ### 추가사항
 - 애니메이션 등 고급 기술도 활용
+
+10 Xb7hH8MSUJpSbSDYk0k2 Alice - Clear, Engaging Educator
+11 XrExE9yKIg1WjnnlVkGX Matilda - Knowledgable, Professional
+14 cjVigY5qzO86Huf0OWal Eric - Smooth, Trustworthy
+16 iP95p4xoKVk53GoZ742B Chris - Charming, Down-to-Earth
