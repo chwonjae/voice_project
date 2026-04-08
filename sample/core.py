@@ -620,13 +620,6 @@ while True:
         user_input = r.recognize_openai(audio) 
         print(f"[USER] {user_input}")
 
-        ############################
-        # 종료 조건
-        ############################
-        if user_input.strip() in ["그만", "종료", "꺼"]:
-            break
-      
-
         # STEP3: LLM 사용자의 입력에 답하기
         answer = chat.send_message(user_input)
 
