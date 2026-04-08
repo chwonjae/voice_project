@@ -6,6 +6,8 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import streamlit as st
+from face_auth import FaceAuthStage, FaceAuthVideoProcessor
+from streamlit_webrtc import WebRtcMode, webrtc_streamer
 from streamlit_extras.stylable_container import stylable_container
 from streamlit_extras.colored_header import colored_header
 from streamlit_extras.add_vertical_space import add_vertical_space
@@ -29,7 +31,6 @@ SAMPLE_SCREEN_SPLASH = "splash"
 SAMPLE_SCREEN_HOME = "home"
 SAMPLE_SCREEN_RECIPIENT = "recipient"
 SAMPLE_SCREEN_AMOUNT = "amount"
-SAMPLE_HIGH_AMOUNT_AI_THRESHOLD = 10_000_000
 SAMPLE_FACE_REGISTRATION_DIR = Path(__file__).resolve().parent / "data" / "registered_faces"
 SAMPLE_FACE_IMAGE_NAME = "primary_user_face.jpg"
 
@@ -524,6 +525,208 @@ def inject_sample_global_styles() -> None:
             line-height: 1.55;
         }
 
+        .sample-face-auth-shell {
+            padding: 16px;
+            border-radius: 22px;
+            background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+            border: 1px solid rgba(37, 99, 235, 0.10);
+        }
+
+        .sample-face-auth-header {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+        }
+
+        .sample-face-auth-subtitle {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
+
+        .sample-face-auth-step-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .sample-face-auth-step {
+            padding: 10px 12px;
+            border-radius: 16px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .sample-face-auth-step-active {
+            background: #eff6ff;
+            border-color: rgba(37, 99, 235, 0.28);
+            color: #1d4ed8;
+        }
+
+        .sample-face-auth-step-done {
+            background: rgba(34, 197, 94, 0.10);
+            border-color: rgba(34, 197, 94, 0.22);
+            color: #15803d;
+        }
+
+        .sample-face-auth-card {
+            margin-top: 14px;
+            padding: 14px 15px;
+            border-radius: 18px;
+            background: white;
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+        }
+
+        .sample-face-auth-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 0.75rem;
+            font-weight: 800;
+        }
+
+        .sample-face-auth-guide {
+            margin-top: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.45;
+        }
+
+        .sample-face-auth-instruction {
+            margin-top: 8px;
+            color: #2563eb;
+            font-size: 0.92rem;
+            font-weight: 800;
+        }
+
+        .sample-face-auth-meta {
+            margin-top: 10px;
+            color: #64748b;
+            font-size: 0.82rem;
+        }
+
+        .sample-face-auth-result {
+            margin-top: 16px;
+            min-height: 240px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            border-radius: 22px;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+            border: 1px solid rgba(37, 99, 235, 0.10);
+        }
+
+        .sample-face-auth-result-success {
+            background: linear-gradient(180deg, #effdf5 0%, #ffffff 100%);
+        }
+
+        .sample-face-auth-result-failed {
+            background: linear-gradient(180deg, #fff5f5 0%, #ffffff 100%);
+        }
+
+        .sample-face-auth-result-ring,
+        .sample-face-auth-result-ring-delay {
+            position: absolute;
+            width: 132px;
+            height: 132px;
+            border-radius: 999px;
+            border: 1px solid rgba(37, 99, 235, 0.18);
+            animation: sampleFaceAuthRing 2s ease-out infinite;
+        }
+
+        .sample-face-auth-result-ring-delay {
+            animation-delay: 0.8s;
+        }
+
+        .sample-face-auth-result-success .sample-face-auth-result-ring,
+        .sample-face-auth-result-success .sample-face-auth-result-ring-delay {
+            border-color: rgba(34, 197, 94, 0.22);
+        }
+
+        .sample-face-auth-result-failed .sample-face-auth-result-ring,
+        .sample-face-auth-result-failed .sample-face-auth-result-ring-delay {
+            border-color: rgba(239, 68, 68, 0.22);
+        }
+
+        .sample-face-auth-result-icon {
+            width: 82px;
+            height: 82px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 800;
+            color: white;
+            z-index: 1;
+        }
+
+        .sample-face-auth-result-icon-success {
+            background: linear-gradient(145deg, #16a34a 0%, #4ade80 100%);
+            box-shadow: 0 16px 32px rgba(34, 197, 94, 0.24);
+        }
+
+        .sample-face-auth-result-icon-failed {
+            background: linear-gradient(145deg, #dc2626 0%, #fb7185 100%);
+            box-shadow: 0 16px 32px rgba(239, 68, 68, 0.22);
+            animation: sampleFaceAuthShake 0.7s ease-in-out 1;
+        }
+
+        .sample-face-auth-result-title {
+            margin-top: 16px;
+            font-size: 1.24rem;
+            font-weight: 800;
+            color: #0f172a;
+            z-index: 1;
+        }
+
+        .sample-face-auth-result-message {
+            margin-top: 8px;
+            max-width: 290px;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.9rem;
+            line-height: 1.55;
+            z-index: 1;
+        }
+
+        @keyframes sampleFaceAuthRing {
+            0% {
+                transform: scale(0.84);
+                opacity: 0;
+            }
+            35% {
+                opacity: 0.5;
+            }
+            100% {
+                transform: scale(1.28);
+                opacity: 0;
+            }
+        }
+
+        @keyframes sampleFaceAuthShake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-6px); }
+            40% { transform: translateX(6px); }
+            60% { transform: translateX(-4px); }
+            80% { transform: translateX(4px); }
+        }
+
         @media (max-width: 520px) {
             section.main > div {
                 padding-left: 0.4rem;
@@ -575,12 +778,22 @@ def initialize_sample_app_state() -> None:
         "sample_has_initialized_demo_data": True,
         "sample_should_auto_advance_from_splash": True,
         "sample_splash_has_advanced": False,
-        "sample_is_high_amount_ai_popup_open": False,
         "sample_is_face_registration_dialog_open": False,
         "sample_is_face_registered": sample_get_registered_face_path().exists(),
         "sample_registered_face_path": "",
         "sample_face_registration_message": "",
         "sample_face_registration_feedback_type": "",
+        "sample_is_face_auth_popup_open": False,
+        "sample_face_auth_stage": FaceAuthStage.IDLE.value,
+        "sample_face_auth_badge_text": "",
+        "sample_face_auth_guide_text": "",
+        "sample_face_auth_instruction_text": "",
+        "sample_face_auth_result_message": "",
+        "sample_face_auth_match_score": None,
+        "sample_face_auth_match_threshold": None,
+        "sample_face_auth_auto_close_at": 0.0,
+        "sample_face_auth_transfer_pending": False,
+        "sample_face_auth_stream_nonce": 0,
     }
 
     for key, value in defaults.items():
@@ -700,6 +913,68 @@ def sample_register_face_image(captured_face) -> tuple[bool, str]:
     return True, f"{message} 저장 위치: {saved_path}"
 
 
+def sample_reset_face_auth_state() -> None:
+    st.session_state.sample_face_auth_stage = FaceAuthStage.IDLE.value
+    st.session_state.sample_face_auth_badge_text = ""
+    st.session_state.sample_face_auth_guide_text = ""
+    st.session_state.sample_face_auth_instruction_text = ""
+    st.session_state.sample_face_auth_result_message = ""
+    st.session_state.sample_face_auth_match_score = None
+    st.session_state.sample_face_auth_match_threshold = None
+    st.session_state.sample_face_auth_auto_close_at = 0.0
+    st.session_state.sample_face_auth_transfer_pending = False
+
+
+def sample_open_face_auth_popup() -> None:
+    sample_reset_face_auth_state()
+    st.session_state.sample_is_face_auth_popup_open = True
+    st.session_state.sample_face_auth_stage = FaceAuthStage.MATCHING.value
+    st.session_state.sample_face_auth_stream_nonce += 1
+
+
+def sample_close_face_auth_popup() -> None:
+    sample_reset_face_auth_state()
+    st.session_state.sample_is_face_auth_popup_open = False
+
+
+def sample_sync_face_auth_snapshot(snapshot) -> None:
+    st.session_state.sample_face_auth_stage = snapshot.stage.value
+    st.session_state.sample_face_auth_badge_text = snapshot.badge_text
+    st.session_state.sample_face_auth_guide_text = snapshot.guide_text
+    st.session_state.sample_face_auth_instruction_text = snapshot.instruction_text
+    st.session_state.sample_face_auth_result_message = snapshot.result_message
+    st.session_state.sample_face_auth_match_score = snapshot.match_score
+    st.session_state.sample_face_auth_match_threshold = snapshot.match_threshold
+
+
+def sample_mark_face_auth_terminal(success: bool, message: str) -> None:
+    target_stage = FaceAuthStage.SUCCESS if success else FaceAuthStage.FAILED
+
+    st.session_state.sample_face_auth_stage = target_stage.value
+    st.session_state.sample_face_auth_badge_text = "검증 완료" if success else "검증 실패"
+    st.session_state.sample_face_auth_guide_text = message
+    st.session_state.sample_face_auth_instruction_text = ""
+    st.session_state.sample_face_auth_result_message = message
+    if float(st.session_state.sample_face_auth_auto_close_at or 0.0) <= 0.0:
+        st.session_state.sample_face_auth_auto_close_at = time.time() + 1.8
+    st.session_state.sample_face_auth_transfer_pending = success
+
+
+def sample_complete_face_auth_flow_if_ready() -> None:
+    if st.session_state.sample_face_auth_stage not in {FaceAuthStage.SUCCESS.value, FaceAuthStage.FAILED.value}:
+        return
+    if time.time() < float(st.session_state.sample_face_auth_auto_close_at or 0.0):
+        return
+
+    if st.session_state.sample_face_auth_transfer_pending:
+        response = sample_submit_mock_transfer_request()
+        st.session_state.sample_recent_action_message = response["message"]
+    else:
+        st.session_state.sample_recent_action_message = "얼굴 인증이 완료되지 않아 송금이 취소되었습니다."
+
+    sample_close_face_auth_popup()
+
+
 # ============================================================
 # Sample Mock Functions (Future FastAPI Replacement Points)
 # ============================================================
@@ -726,36 +1001,6 @@ def sample_submit_mock_transfer_request() -> dict:
         "recipient_account": st.session_state.sample_recipient_account_number,
         "amount": st.session_state.sample_transfer_amount,
     }
-
-
-def sample_should_trigger_high_amount_ai_popup(amount: int) -> bool:
-    return amount >= SAMPLE_HIGH_AMOUNT_AI_THRESHOLD
-
-
-def sample_open_high_amount_ai_popup() -> None:
-    st.session_state.sample_is_high_amount_ai_popup_open = True
-
-
-def sample_close_high_amount_ai_popup() -> None:
-    st.session_state.sample_is_high_amount_ai_popup_open = False
-
-
-def sample_get_mock_high_amount_ai_message() -> str:
-    return (
-        "안녕하세요. 고액 이체 전 안전 확인을 도와드릴게요. "
-        "이번 송금 목적과 받는 분 정보를 말씀해 주세요."
-    )
-
-
-def sample_complete_mock_high_amount_ai_review() -> None:
-    st.session_state.sample_is_high_amount_ai_popup_open = False
-
-    response = sample_submit_mock_transfer_request()
-    st.session_state.sample_recent_action_message = (
-        "1천만원 이상 이체에 대한 AI 음성 상담 목업이 완료되었습니다. "
-        f"{response['message']}"
-    )
-
 
 # ============================================================
 # Components
@@ -1126,12 +1371,8 @@ def handle_sample_transfer_submit() -> None:
         st.session_state.sample_recent_action_message = "보낼 금액을 입력해 주세요."
         return
 
-    if sample_should_trigger_high_amount_ai_popup(st.session_state.sample_transfer_amount):
-        sample_open_high_amount_ai_popup()
-        return
-
-    response = sample_submit_mock_transfer_request()
-    st.session_state.sample_recent_action_message = response["message"]
+    st.session_state.sample_recent_action_message = ""
+    sample_open_face_auth_popup()
 
 
 
@@ -1186,83 +1427,142 @@ def render_sample_face_registration_dialog() -> None:
             sample_close_face_registration_dialog()
 
 
-@st.dialog("AI 안심 확인", width="large", dismissible=False)
-def render_sample_high_amount_ai_popup() -> None:
-    st.markdown(
-        """
-        <div class="sample-ai-review-hero">
-            <div class="sample-ai-review-chip">AI VOICE REVIEW · HIGH AMOUNT</div>
-            <div class="sample-ai-review-title">1천만원 이상 이체 전<br/>AI 안심 확인</div>
-            <div class="sample-ai-review-subtitle">
-                현재는 Streamlit 목업 단계예요.<br/>
-                추후 이 영역에 실제 음성 챗봇이 연결될 예정입니다.
-            </div>
-            <div class="sample-ai-voice-stage">
-                <div class="sample-ai-orb-wrap">
-                    <div class="sample-ai-orb-ring"></div>
-                    <div class="sample-ai-orb-ring-delay"></div>
-                    <div class="sample-ai-orb-core">AI</div>
-                </div>
-                <div class="sample-ai-eq">
-                    <div class="sample-ai-eq-bar"></div>
-                    <div class="sample-ai-eq-bar"></div>
-                    <div class="sample-ai-eq-bar"></div>
-                    <div class="sample-ai-eq-bar"></div>
-                    <div class="sample-ai-eq-bar"></div>
-                </div>
-                <div class="sample-ai-voice-status">AI가 안내 멘트를 말하고 있어요…</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+def render_sample_face_auth_steps() -> None:
+    current_stage = st.session_state.sample_face_auth_stage
+    matching_class = "sample-face-auth-step sample-face-auth-step-active"
+    liveness_class = "sample-face-auth-step"
+    result_class = "sample-face-auth-step"
 
-    st.markdown(
-        f'<div class="sample-ai-transcript">{sample_get_mock_high_amount_ai_message()}</div>',
-        unsafe_allow_html=True,
-    )
-
-    summary_col_1, summary_col_2 = st.columns(2)
-    with summary_col_1:
-        st.markdown(
-            f"""
-            <div class="sample-ai-summary-card">
-                <div class="sample-ai-summary-label">받는 은행</div>
-                <div class="sample-ai-summary-value">{st.session_state.sample_selected_bank_name}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with summary_col_2:
-        st.markdown(
-            f"""
-            <div class="sample-ai-summary-card">
-                <div class="sample-ai-summary-label">계좌번호</div>
-                <div class="sample-ai-summary-value">{st.session_state.sample_recipient_account_number}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    if current_stage in {FaceAuthStage.LIVENESS.value, FaceAuthStage.SUCCESS.value}:
+        matching_class = "sample-face-auth-step sample-face-auth-step-done"
+        liveness_class = "sample-face-auth-step sample-face-auth-step-active"
+    if current_stage == FaceAuthStage.SUCCESS.value:
+        liveness_class = "sample-face-auth-step sample-face-auth-step-done"
+        result_class = "sample-face-auth-step sample-face-auth-step-done"
+    if current_stage == FaceAuthStage.FAILED.value:
+        result_class = "sample-face-auth-step sample-face-auth-step-active"
 
     st.markdown(
         f"""
-        <div class="sample-ai-summary-card">
-            <div class="sample-ai-summary-label">검토 대상 금액</div>
-            <div class="sample-ai-summary-value">{st.session_state.sample_transfer_amount_display}</div>
+        <div class="sample-face-auth-step-grid">
+            <div class="{matching_class}">1. 얼굴 일치 확인</div>
+            <div class="{liveness_class}">2. 라이브니스 검증</div>
+            <div class="{result_class}">3. 결과 확인</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    action_col_1, action_col_2 = st.columns(2)
-    with action_col_1:
-        if st.button("목업 상담 완료", key="sample_high_amount_ai_complete", use_container_width=True):
-            sample_complete_mock_high_amount_ai_review()
-            st.rerun()
-    with action_col_2:
-        if st.button("다시 금액 보기", key="sample_high_amount_ai_close", use_container_width=True):
-            sample_close_high_amount_ai_popup()
-            st.rerun()
+
+def render_sample_face_auth_result_card(success: bool) -> None:
+    result_class = "sample-face-auth-result-success" if success else "sample-face-auth-result-failed"
+    icon_class = "sample-face-auth-result-icon-success" if success else "sample-face-auth-result-icon-failed"
+    icon = "✓" if success else "!"
+    title = "검증 완료" if success else "검증 실패"
+    message = st.session_state.sample_face_auth_result_message or st.session_state.sample_face_auth_guide_text
+
+    st.markdown(
+        f"""
+        <div class="sample-face-auth-result {result_class}">
+            <div class="sample-face-auth-result-ring"></div>
+            <div class="sample-face-auth-result-ring-delay"></div>
+            <div class="sample-face-auth-result-icon {icon_class}">{icon}</div>
+            <div class="sample-face-auth-result-title">{title}</div>
+            <div class="sample-face-auth-result-message">{message}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+@st.dialog("송금 얼굴 인증", width="large", dismissible=False)
+def render_sample_face_auth_popup() -> None:
+    sample_complete_face_auth_flow_if_ready()
+    if not st.session_state.sample_is_face_auth_popup_open:
+        st.rerun()
+
+    registered_face_path = sample_get_registered_face_path()
+    if (
+        not registered_face_path.exists()
+        and st.session_state.sample_face_auth_stage not in {FaceAuthStage.SUCCESS.value, FaceAuthStage.FAILED.value}
+    ):
+        sample_mark_face_auth_terminal(False, "등록된 얼굴이 없어 송금을 진행할 수 없습니다.")
+
+    current_stage = st.session_state.sample_face_auth_stage
+    is_terminal = current_stage in {FaceAuthStage.SUCCESS.value, FaceAuthStage.FAILED.value}
+
+    st.markdown('<div class="sample-face-auth-shell">', unsafe_allow_html=True)
+    st.markdown('<div class="sample-face-auth-header">본인 확인을 진행할게요</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sample-face-auth-subtitle">등록된 얼굴과 현재 얼굴을 비교한 뒤, 2단계 라이브니스 검증으로 송금 전 본인 여부를 확인합니다.</div>',
+        unsafe_allow_html=True,
+    )
+    render_sample_face_auth_steps()
+
+    st.markdown(
+        f"""
+        <div class="sample-face-auth-card">
+            <div class="sample-face-auth-badge">{st.session_state.sample_face_auth_badge_text or "얼굴 인증 준비"}</div>
+            <div class="sample-face-auth-guide">{st.session_state.sample_face_auth_guide_text or "카메라를 준비하고 있습니다."}</div>
+            <div class="sample-face-auth-instruction">{st.session_state.sample_face_auth_instruction_text}</div>
+            <div class="sample-face-auth-meta">보낼 은행: {st.session_state.sample_selected_bank_name} · 계좌번호: {st.session_state.sample_recipient_account_number} · 금액: {st.session_state.sample_transfer_amount_display}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if is_terminal:
+        render_sample_face_auth_result_card(current_stage == FaceAuthStage.SUCCESS.value)
+        st.markdown("</div>", unsafe_allow_html=True)
+        time.sleep(0.35)
+        st.rerun()
+        return
+
+    add_vertical_space(1)
+    stream_key = f"sample_face_auth_stream_{st.session_state.sample_face_auth_stream_nonce}"
+    ctx = webrtc_streamer(
+        key=stream_key,
+        mode=WebRtcMode.SENDRECV,
+        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+        media_stream_constraints={"video": {"facingMode": "user"}, "audio": False},
+        desired_playing_state=True,
+        video_processor_factory=FaceAuthVideoProcessor,
+        async_processing=True,
+        sendback_audio=False,
+    )
+
+    processor = ctx.video_processor if ctx else None
+    if processor is not None:
+        ok, message = processor.configure(str(registered_face_path), challenge_count=2)
+        if not ok:
+            sample_mark_face_auth_terminal(False, message)
+        else:
+            snapshot = processor.get_snapshot()
+            sample_sync_face_auth_snapshot(snapshot)
+            if snapshot.stage == FaceAuthStage.SUCCESS:
+                sample_mark_face_auth_terminal(True, snapshot.result_message or snapshot.guide_text)
+            elif snapshot.stage == FaceAuthStage.FAILED:
+                sample_mark_face_auth_terminal(False, snapshot.result_message or snapshot.guide_text)
+
+    match_score = st.session_state.sample_face_auth_match_score
+    if match_score is not None:
+        threshold = st.session_state.sample_face_auth_match_threshold
+        threshold_text = f" / 기준 {threshold:.2f}" if threshold is not None else ""
+        st.caption(f"얼굴 일치 점수 {match_score:.2f}{threshold_text}")
+
+    if not ctx or not ctx.state.playing:
+        st.info("브라우저에서 카메라 권한을 허용하면 얼굴 인증이 자동으로 시작됩니다.")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if st.session_state.sample_face_auth_stage in {FaceAuthStage.SUCCESS.value, FaceAuthStage.FAILED.value}:
+        time.sleep(0.35)
+        st.rerun()
+        return
+
+    if ctx and ctx.state.playing:
+        time.sleep(0.35)
+        st.rerun()
 
 
 
@@ -1400,8 +1700,8 @@ def main() -> None:
     render_sample_current_screen()
     if st.session_state.sample_is_face_registration_dialog_open:
         render_sample_face_registration_dialog()
-    if st.session_state.sample_is_high_amount_ai_popup_open:
-        render_sample_high_amount_ai_popup()
+    if st.session_state.sample_is_face_auth_popup_open:
+        render_sample_face_auth_popup()
 
 
 if __name__ == "__main__":
