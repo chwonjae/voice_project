@@ -25,6 +25,7 @@ SAMPLE_SCREEN_SPLASH = "splash"
 SAMPLE_SCREEN_HOME = "home"
 SAMPLE_SCREEN_RECIPIENT = "recipient"
 SAMPLE_SCREEN_AMOUNT = "amount"
+SAMPLE_HIGH_AMOUNT_AI_THRESHOLD = 10_000_000
 
 SAMPLE_AVAILABLE_BANK_OPTIONS = [
     "신한은행",
@@ -273,6 +274,190 @@ def inject_sample_global_styles() -> None:
             text-align: center;
         }
 
+        .sample-ai-review-hero {
+            position: relative;
+            min-height: 200px;
+            border-radius: 24px;
+            padding: 20px 16px;
+            background:
+                radial-gradient(circle at top, rgba(96,165,250,0.28), transparent 42%),
+                linear-gradient(180deg, #eff6ff 0%, #f8fbff 100%);
+            border: 1px solid rgba(37, 99, 235, 0.12);
+            overflow: hidden;
+        }
+
+        .sample-ai-review-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            color: #1d4ed8;
+            background: rgba(255,255,255,0.82);
+            border: 1px solid rgba(37, 99, 235, 0.10);
+        }
+
+        .sample-ai-review-title {
+            margin-top: 14px;
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.03em;
+        }
+
+        .sample-ai-review-subtitle {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .sample-ai-voice-stage {
+            margin-top: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .sample-ai-orb-wrap {
+            position: relative;
+            width: 104px;
+            height: 104px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sample-ai-orb-ring,
+        .sample-ai-orb-ring-delay {
+            position: absolute;
+            width: 104px;
+            height: 104px;
+            border-radius: 999px;
+            border: 1px solid rgba(37, 99, 235, 0.18);
+            animation: sampleVoicePulse 2.2s ease-out infinite;
+        }
+
+        .sample-ai-orb-ring-delay {
+            animation-delay: 1.1s;
+        }
+
+        .sample-ai-orb-core {
+            width: 72px;
+            height: 72px;
+            border-radius: 999px;
+            background: linear-gradient(145deg, #2563eb 0%, #60a5fa 100%);
+            box-shadow: 0 18px 32px rgba(37, 99, 235, 0.26);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.45rem;
+            font-weight: 800;
+            animation: sampleVoiceGlow 1.6s ease-in-out infinite;
+        }
+
+        .sample-ai-eq {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 6px;
+            height: 36px;
+        }
+
+        .sample-ai-eq-bar {
+            width: 8px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #93c5fd 0%, #2563eb 100%);
+            transform-origin: bottom;
+            animation: sampleVoiceBar 1s ease-in-out infinite;
+        }
+
+        .sample-ai-eq-bar:nth-child(1) { height: 14px; animation-delay: 0s; }
+        .sample-ai-eq-bar:nth-child(2) { height: 28px; animation-delay: 0.15s; }
+        .sample-ai-eq-bar:nth-child(3) { height: 22px; animation-delay: 0.3s; }
+        .sample-ai-eq-bar:nth-child(4) { height: 30px; animation-delay: 0.45s; }
+        .sample-ai-eq-bar:nth-child(5) { height: 18px; animation-delay: 0.6s; }
+
+        .sample-ai-voice-status {
+            font-size: 0.84rem;
+            font-weight: 700;
+            color: #1d4ed8;
+        }
+
+        .sample-ai-transcript {
+            margin-top: 14px;
+            padding: 14px 15px;
+            border-radius: 18px 18px 18px 8px;
+            background: white;
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+            color: #1e293b;
+            font-size: 0.92rem;
+            line-height: 1.58;
+        }
+
+        .sample-ai-summary-card {
+            margin-top: 12px;
+            padding: 14px 15px;
+            border-radius: 18px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+
+        .sample-ai-summary-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .sample-ai-summary-value {
+            margin-top: 4px;
+            color: #0f172a;
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        @keyframes sampleVoicePulse {
+            0% {
+                transform: scale(0.82);
+                opacity: 0;
+            }
+            35% {
+                opacity: 0.55;
+            }
+            100% {
+                transform: scale(1.32);
+                opacity: 0;
+            }
+        }
+
+        @keyframes sampleVoiceGlow {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.07);
+            }
+        }
+
+        @keyframes sampleVoiceBar {
+            0%, 100% {
+                transform: scaleY(0.45);
+                opacity: 0.62;
+            }
+            50% {
+                transform: scaleY(1.05);
+                opacity: 1;
+            }
+        }
+
         div[data-testid="stButton"] > button {
             border-radius: 14px;
             min-height: 48px;
@@ -346,6 +531,7 @@ def initialize_sample_app_state() -> None:
         "sample_has_initialized_demo_data": True,
         "sample_should_auto_advance_from_splash": True,
         "sample_splash_has_advanced": False,
+        "sample_is_high_amount_ai_popup_open": False,
     }
 
     for key, value in defaults.items():
@@ -415,6 +601,35 @@ def sample_submit_mock_transfer_request() -> dict:
         "recipient_account": st.session_state.sample_recipient_account_number,
         "amount": st.session_state.sample_transfer_amount,
     }
+
+
+def sample_should_trigger_high_amount_ai_popup(amount: int) -> bool:
+    return amount >= SAMPLE_HIGH_AMOUNT_AI_THRESHOLD
+
+
+def sample_open_high_amount_ai_popup() -> None:
+    st.session_state.sample_is_high_amount_ai_popup_open = True
+
+
+def sample_close_high_amount_ai_popup() -> None:
+    st.session_state.sample_is_high_amount_ai_popup_open = False
+
+
+def sample_get_mock_high_amount_ai_message() -> str:
+    return (
+        "안녕하세요. 고액 이체 전 안전 확인을 도와드릴게요. "
+        "이번 송금 목적과 받는 분 정보를 말씀해 주세요."
+    )
+
+
+def sample_complete_mock_high_amount_ai_review() -> None:
+    st.session_state.sample_is_high_amount_ai_popup_open = False
+
+    response = sample_submit_mock_transfer_request()
+    st.session_state.sample_recent_action_message = (
+        "1천만원 이상 이체에 대한 AI 음성 상담 목업이 완료되었습니다. "
+        f"{response['message']}"
+    )
 
 
 # ============================================================
@@ -764,6 +979,10 @@ def handle_sample_transfer_submit() -> None:
         st.session_state.sample_recent_action_message = "보낼 금액을 입력해 주세요."
         return
 
+    if sample_should_trigger_high_amount_ai_popup(st.session_state.sample_transfer_amount):
+        sample_open_high_amount_ai_popup()
+        return
+
     response = sample_submit_mock_transfer_request()
     st.session_state.sample_recent_action_message = response["message"]
 
@@ -774,6 +993,85 @@ def render_sample_keypad_button(label: str, button_key: str, on_click_action=Non
         if on_click_action:
             on_click_action()
         st.rerun()
+
+
+@st.dialog("AI 안심 확인", width="large", dismissible=False)
+def render_sample_high_amount_ai_popup() -> None:
+    st.markdown(
+        """
+        <div class="sample-ai-review-hero">
+            <div class="sample-ai-review-chip">AI VOICE REVIEW · HIGH AMOUNT</div>
+            <div class="sample-ai-review-title">1천만원 이상 이체 전<br/>AI 안심 확인</div>
+            <div class="sample-ai-review-subtitle">
+                현재는 Streamlit 목업 단계예요.<br/>
+                추후 이 영역에 실제 음성 챗봇이 연결될 예정입니다.
+            </div>
+            <div class="sample-ai-voice-stage">
+                <div class="sample-ai-orb-wrap">
+                    <div class="sample-ai-orb-ring"></div>
+                    <div class="sample-ai-orb-ring-delay"></div>
+                    <div class="sample-ai-orb-core">AI</div>
+                </div>
+                <div class="sample-ai-eq">
+                    <div class="sample-ai-eq-bar"></div>
+                    <div class="sample-ai-eq-bar"></div>
+                    <div class="sample-ai-eq-bar"></div>
+                    <div class="sample-ai-eq-bar"></div>
+                    <div class="sample-ai-eq-bar"></div>
+                </div>
+                <div class="sample-ai-voice-status">AI가 안내 멘트를 말하고 있어요…</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f'<div class="sample-ai-transcript">{sample_get_mock_high_amount_ai_message()}</div>',
+        unsafe_allow_html=True,
+    )
+
+    summary_col_1, summary_col_2 = st.columns(2)
+    with summary_col_1:
+        st.markdown(
+            f"""
+            <div class="sample-ai-summary-card">
+                <div class="sample-ai-summary-label">받는 은행</div>
+                <div class="sample-ai-summary-value">{st.session_state.sample_selected_bank_name}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with summary_col_2:
+        st.markdown(
+            f"""
+            <div class="sample-ai-summary-card">
+                <div class="sample-ai-summary-label">계좌번호</div>
+                <div class="sample-ai-summary-value">{st.session_state.sample_recipient_account_number}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        f"""
+        <div class="sample-ai-summary-card">
+            <div class="sample-ai-summary-label">검토 대상 금액</div>
+            <div class="sample-ai-summary-value">{st.session_state.sample_transfer_amount_display}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    action_col_1, action_col_2 = st.columns(2)
+    with action_col_1:
+        if st.button("목업 상담 완료", key="sample_high_amount_ai_complete", use_container_width=True):
+            sample_complete_mock_high_amount_ai_review()
+            st.rerun()
+    with action_col_2:
+        if st.button("다시 금액 보기", key="sample_high_amount_ai_close", use_container_width=True):
+            sample_close_high_amount_ai_popup()
+            st.rerun()
 
 
 
@@ -909,6 +1207,8 @@ def main() -> None:
     initialize_sample_app_state()
     format_sample_amount_for_display()
     render_sample_current_screen()
+    if st.session_state.sample_is_high_amount_ai_popup_open:
+        render_sample_high_amount_ai_popup()
 
 
 if __name__ == "__main__":
