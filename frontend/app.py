@@ -44,6 +44,50 @@ SAMPLE_AVAILABLE_BANK_OPTIONS = [
     "토스뱅크",
     "기업은행",
 ]
+SAMPLE_VOICE_MODE_FREE = "free"
+SAMPLE_VOICE_MODE_TURN = "turn"
+SAMPLE_VOICE_FREE_DEMO_MESSAGES = [
+    {
+        "role": "assistant",
+        "text": "안녕하세요. 송금 전에 통화 상황을 짧게 같이 점검할게요. 지금 누구에게 어떤 이유로 보내려는지 편하게 말씀해 주세요.",
+    },
+    {
+        "role": "user",
+        "text": "상대가 카드 배송이 잘못됐다면서, 오늘 안에 확인금처럼 먼저 보내 달라고 했어요.",
+    },
+    {
+        "role": "assistant",
+        "text": "배송 문제를 이유로 먼저 송금을 요구하면 주의가 필요해요. 링크 클릭이나 앱 설치를 같이 요청받았는지도 확인해 볼게요.",
+    },
+    {
+        "role": "user",
+        "text": "메신저로 온 링크를 눌러서 본인 확인을 하라고도 했어요.",
+    },
+    {
+        "role": "assistant",
+        "text": "현재 디자인에서는 이런 흐름이 위험 신호 카드로 묶여 보이도록 구성했어요. 실제 STT와 판정 API는 다음 단계에서 연결하면 됩니다.",
+    },
+]
+SAMPLE_VOICE_TURN_DEMO_FLOW = [
+    {
+        "title": "1차 점검",
+        "prompt": "먼저 사용자가 지금 누구에게 얼마를 보내려는지 음성으로 남기는 단계입니다.",
+        "user_example": "아는 동생이라고 해서 50만원만 먼저 보내 달라는 상황이에요.",
+        "assistant_reply": "첫 응답을 바탕으로 상대의 정체와 송금 이유를 더 묻는 음성이 생성됩니다.",
+    },
+    {
+        "title": "2차 재질문",
+        "prompt": "다음 턴에서는 기관 사칭이나 앱 설치 요구가 있었는지 다시 확인합니다.",
+        "user_example": "검찰은 아니고, 원격으로 확인해야 한다면서 앱을 깔라고 했어요.",
+        "assistant_reply": "두 번째 응답 뒤에는 위험 근거와 즉시 행동 가이드가 함께 정리됩니다.",
+    },
+    {
+        "title": "3차 종료 안내",
+        "prompt": "마지막 턴에서는 송금 보류, 공식 번호 재확인, 가족 연락 여부를 정리하는 마무리 음성이 이어집니다.",
+        "user_example": "일단 송금은 멈추고 직접 다시 확인해 볼게요.",
+        "assistant_reply": "턴제형의 마지막 화면은 완료 애니메이션과 함께 최종 안내 카드로 닫히도록 디자인합니다.",
+    },
+]
 
 
 # ============================================================
@@ -705,6 +749,356 @@ def inject_sample_global_styles() -> None:
             z-index: 1;
         }
 
+        .sample-voice-shell {
+            padding: 18px;
+            border-radius: 24px;
+            background:
+                radial-gradient(circle at top, rgba(96, 165, 250, 0.16), transparent 42%),
+                linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+            border: 1px solid rgba(37, 99, 235, 0.10);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+        }
+
+        .sample-voice-title {
+            font-size: 1.28rem;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.03em;
+        }
+
+        .sample-voice-subtitle {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 0.9rem;
+            line-height: 1.55;
+        }
+
+        .sample-voice-mode-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .sample-voice-mode-card {
+            min-height: 188px;
+            padding: 16px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.96);
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .sample-voice-mode-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 16px 28px rgba(37, 99, 235, 0.10);
+        }
+
+        .sample-voice-mode-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .sample-voice-mode-title {
+            margin-top: 14px;
+            font-size: 1rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .sample-voice-mode-body {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 0.86rem;
+            line-height: 1.55;
+        }
+
+        .sample-voice-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .sample-voice-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #475569;
+            font-size: 0.74rem;
+            font-weight: 700;
+        }
+
+        .sample-voice-recorder-card {
+            margin-top: 16px;
+            padding: 18px 14px;
+            border-radius: 20px;
+            background: linear-gradient(180deg, #eff6ff 0%, #f8fbff 100%);
+            border: 1px solid rgba(37, 99, 235, 0.12);
+            text-align: center;
+        }
+
+        .sample-voice-recorder-orb {
+            position: relative;
+            width: 88px;
+            height: 88px;
+            margin: 0 auto 12px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sample-voice-recorder-ring,
+        .sample-voice-recorder-ring-delay {
+            position: absolute;
+            width: 88px;
+            height: 88px;
+            border-radius: 999px;
+            border: 1px solid rgba(37, 99, 235, 0.18);
+            animation: sampleVoicePulse 2.2s ease-out infinite;
+        }
+
+        .sample-voice-recorder-ring-delay {
+            animation-delay: 1s;
+        }
+
+        .sample-voice-recorder-core {
+            width: 58px;
+            height: 58px;
+            border-radius: 999px;
+            background: linear-gradient(145deg, #2563eb 0%, #60a5fa 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 800;
+            box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
+        }
+
+        .sample-voice-recorder-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .sample-voice-recorder-caption {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 0.84rem;
+            line-height: 1.5;
+        }
+
+        .sample-voice-bubble {
+            margin-top: 10px;
+            padding: 14px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            line-height: 1.58;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+            animation: sampleFadeUp 0.35s ease-out;
+        }
+
+        .sample-voice-bubble-user {
+            margin-left: 40px;
+            background: linear-gradient(145deg, #1452d9 0%, #2563eb 100%);
+            color: white;
+            border-bottom-right-radius: 8px;
+        }
+
+        .sample-voice-bubble-ai {
+            margin-right: 40px;
+            background: white;
+            color: #1e293b;
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            border-bottom-left-radius: 8px;
+        }
+
+        .sample-voice-bubble-label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.74rem;
+            font-weight: 800;
+            opacity: 0.78;
+        }
+
+        .sample-voice-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .sample-voice-summary-card {
+            padding: 14px;
+            border-radius: 18px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+
+        .sample-voice-summary-label {
+            font-size: 0.72rem;
+            font-weight: 800;
+            color: #64748b;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .sample-voice-summary-value {
+            margin-top: 6px;
+            color: #0f172a;
+            font-size: 0.95rem;
+            font-weight: 800;
+            line-height: 1.45;
+        }
+
+        .sample-voice-list-card {
+            margin-top: 12px;
+            padding: 14px 15px;
+            border-radius: 18px;
+            background: white;
+            border: 1px solid rgba(15, 23, 42, 0.06);
+        }
+
+        .sample-voice-list-title {
+            font-size: 0.86rem;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+
+        .sample-voice-list-item {
+            color: #475569;
+            font-size: 0.86rem;
+            line-height: 1.55;
+            margin-bottom: 6px;
+        }
+
+        .sample-turn-progress {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .sample-turn-progress-item {
+            padding: 11px 10px;
+            border-radius: 16px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: #64748b;
+        }
+
+        .sample-turn-progress-done {
+            background: rgba(34, 197, 94, 0.10);
+            border-color: rgba(34, 197, 94, 0.22);
+            color: #15803d;
+        }
+
+        .sample-turn-progress-active {
+            background: #eff6ff;
+            border-color: rgba(37, 99, 235, 0.24);
+            color: #1d4ed8;
+        }
+
+        .sample-turn-stage-card {
+            margin-top: 14px;
+            padding: 16px;
+            border-radius: 20px;
+            background: white;
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+        }
+
+        .sample-turn-stage-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 0.74rem;
+            font-weight: 800;
+        }
+
+        .sample-turn-stage-title {
+            margin-top: 12px;
+            font-size: 1rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .sample-turn-stage-copy {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 0.88rem;
+            line-height: 1.55;
+        }
+
+        .sample-turn-audio-card {
+            margin-top: 12px;
+            padding: 14px;
+            border-radius: 18px;
+            background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+            border: 1px solid rgba(37, 99, 235, 0.10);
+        }
+
+        .sample-turn-audio-wave {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 6px;
+            height: 34px;
+            margin-top: 12px;
+        }
+
+        .sample-turn-audio-wave span {
+            width: 8px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #93c5fd 0%, #2563eb 100%);
+            animation: sampleVoiceBar 1s ease-in-out infinite;
+            transform-origin: bottom;
+        }
+
+        .sample-turn-audio-wave span:nth-child(1) { height: 14px; animation-delay: 0s; }
+        .sample-turn-audio-wave span:nth-child(2) { height: 28px; animation-delay: 0.15s; }
+        .sample-turn-audio-wave span:nth-child(3) { height: 18px; animation-delay: 0.3s; }
+        .sample-turn-audio-wave span:nth-child(4) { height: 30px; animation-delay: 0.45s; }
+        .sample-turn-audio-wave span:nth-child(5) { height: 20px; animation-delay: 0.6s; }
+
+        .sample-turn-complete-card {
+            margin-top: 16px;
+            min-height: 220px;
+            border-radius: 22px;
+            background: linear-gradient(180deg, #effdf5 0%, #ffffff 100%);
+            border: 1px solid rgba(34, 197, 94, 0.18);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sample-turn-complete-card .sample-face-auth-result-ring,
+        .sample-turn-complete-card .sample-face-auth-result-ring-delay {
+            border-color: rgba(34, 197, 94, 0.24);
+        }
+
         @keyframes sampleFaceAuthRing {
             0% {
                 transform: scale(0.84);
@@ -794,6 +1188,16 @@ def initialize_sample_app_state() -> None:
         "sample_face_auth_auto_close_at": 0.0,
         "sample_face_auth_transfer_pending": False,
         "sample_face_auth_stream_nonce": 0,
+        "sample_is_voice_mode_selector_popup_open": False,
+        "sample_is_voice_free_chat_popup_open": False,
+        "sample_is_voice_turn_chat_popup_open": False,
+        "sample_voice_selected_mode": "",
+        "sample_voice_free_demo_message_count": 3,
+        "sample_voice_free_show_analysis": True,
+        "sample_voice_free_status_text": "대화 대기",
+        "sample_voice_turn_stage": "opening_ready",
+        "sample_voice_turn_index": 0,
+        "sample_voice_turn_hint_text": "사용자 음성을 먼저 받는 턴제 흐름을 시각적으로 확인하는 단계입니다.",
     }
 
     for key, value in defaults.items():
@@ -967,12 +1371,170 @@ def sample_complete_face_auth_flow_if_ready() -> None:
         return
 
     if st.session_state.sample_face_auth_transfer_pending:
-        response = sample_submit_mock_transfer_request()
-        st.session_state.sample_recent_action_message = response["message"]
+        sample_close_face_auth_popup()
+        sample_open_voice_mode_selector_popup()
+        return
     else:
         st.session_state.sample_recent_action_message = "얼굴 인증이 완료되지 않아 송금이 취소되었습니다."
 
     sample_close_face_auth_popup()
+
+
+def sample_reset_voice_chatbot_ui_state() -> None:
+    st.session_state.sample_is_voice_mode_selector_popup_open = False
+    st.session_state.sample_is_voice_free_chat_popup_open = False
+    st.session_state.sample_is_voice_turn_chat_popup_open = False
+    st.session_state.sample_voice_selected_mode = ""
+    st.session_state.sample_voice_free_demo_message_count = 3
+    st.session_state.sample_voice_free_show_analysis = True
+    st.session_state.sample_voice_free_status_text = "대화 대기"
+    st.session_state.sample_voice_turn_stage = "opening_ready"
+    st.session_state.sample_voice_turn_index = 0
+    st.session_state.sample_voice_turn_hint_text = "사용자 음성을 먼저 받는 턴제 흐름을 시각적으로 확인하는 단계입니다."
+
+
+def sample_open_voice_mode_selector_popup() -> None:
+    sample_reset_voice_chatbot_ui_state()
+    st.session_state.sample_is_voice_mode_selector_popup_open = True
+
+
+def sample_open_voice_free_chat_popup() -> None:
+    sample_reset_voice_chatbot_ui_state()
+    st.session_state.sample_voice_selected_mode = SAMPLE_VOICE_MODE_FREE
+    st.session_state.sample_is_voice_free_chat_popup_open = True
+    st.session_state.sample_voice_free_status_text = "실시간 자유 대화 시안"
+
+
+def sample_open_voice_turn_chat_popup() -> None:
+    sample_reset_voice_chatbot_ui_state()
+    st.session_state.sample_voice_selected_mode = SAMPLE_VOICE_MODE_TURN
+    st.session_state.sample_is_voice_turn_chat_popup_open = True
+    st.session_state.sample_voice_turn_stage = "user_record_ready"
+    st.session_state.sample_voice_turn_hint_text = "첫 번째 사용자 녹음 카드가 준비되었습니다."
+
+
+def sample_close_voice_chatbot_ui(message: str = "") -> None:
+    sample_reset_voice_chatbot_ui_state()
+    if message:
+        st.session_state.sample_recent_action_message = message
+
+
+def sample_finish_voice_chatbot_demo(mode_label: str) -> None:
+    response = sample_submit_mock_transfer_request()
+    sample_close_voice_chatbot_ui(
+        f"{mode_label} UI 시안을 확인했습니다. {response['message']}"
+    )
+
+
+def sample_reveal_next_free_demo_message() -> None:
+    next_count = min(
+        st.session_state.sample_voice_free_demo_message_count + 1,
+        len(SAMPLE_VOICE_FREE_DEMO_MESSAGES),
+    )
+    st.session_state.sample_voice_free_demo_message_count = next_count
+    if next_count >= len(SAMPLE_VOICE_FREE_DEMO_MESSAGES):
+        st.session_state.sample_voice_free_status_text = "위험 분석 카드까지 노출됨"
+    else:
+        st.session_state.sample_voice_free_status_text = "대화가 한 턴 더 확장됨"
+
+
+def sample_advance_turn_chat_demo() -> None:
+    current_stage = st.session_state.sample_voice_turn_stage
+    current_index = int(st.session_state.sample_voice_turn_index)
+    is_last_turn = current_index >= len(SAMPLE_VOICE_TURN_DEMO_FLOW) - 1
+
+    if current_stage == "opening_ready":
+        st.session_state.sample_voice_turn_stage = "user_record_ready"
+        st.session_state.sample_voice_turn_hint_text = "사용자 녹음 카드가 열렸습니다."
+    elif current_stage == "user_record_ready":
+        st.session_state.sample_voice_turn_stage = "server_processing"
+        st.session_state.sample_voice_turn_hint_text = "다음 단계 버튼으로 LLM 음성 생성 화면으로 넘어갑니다."
+    elif current_stage == "server_processing":
+        st.session_state.sample_voice_turn_stage = "ai_play_ready"
+        st.session_state.sample_voice_turn_hint_text = "AI 음성 생성이 끝난 상태를 시각적으로 보여줍니다."
+    elif current_stage == "ai_play_ready":
+        if is_last_turn:
+            st.session_state.sample_voice_turn_stage = "completed"
+            st.session_state.sample_voice_turn_hint_text = "턴제 대화형의 완료 화면입니다."
+        else:
+            st.session_state.sample_voice_turn_stage = "next_ai_ready"
+            st.session_state.sample_voice_turn_hint_text = "다음 질문으로 이어질 준비가 되었습니다."
+    elif current_stage == "next_ai_ready":
+        st.session_state.sample_voice_turn_index = current_index + 1
+        st.session_state.sample_voice_turn_stage = "user_record_ready"
+        st.session_state.sample_voice_turn_hint_text = "다음 사용자 녹음 턴이 열렸습니다."
+
+
+def sample_get_turn_demo_primary_label() -> str:
+    stage = st.session_state.sample_voice_turn_stage
+    labels = {
+        "opening_ready": "첫 녹음 단계 열기",
+        "user_record_ready": "다음 스텝 보기",
+        "server_processing": "생성된 음성 확인",
+        "ai_play_ready": "재생 후 다음 턴으로 이동",
+        "next_ai_ready": "다음 사용자 녹음 열기",
+        "completed": "턴제형 UI 데모 종료",
+    }
+    return labels.get(stage, "다음 스텝 보기")
+
+
+def sample_get_turn_demo_stage_badge() -> str:
+    stage = st.session_state.sample_voice_turn_stage
+    badges = {
+        "opening_ready": "시작 안내",
+        "user_record_ready": "사용자 녹음",
+        "server_processing": "LLM 음성 생성",
+        "ai_play_ready": "생성 음성 재생",
+        "next_ai_ready": "다음 턴 대기",
+        "completed": "완료 화면",
+    }
+    return badges.get(stage, "턴제 흐름")
+
+
+def sample_render_voice_choice_card(icon: str, title: str, body: str, chips: list[str]) -> None:
+    chip_markup = "".join([f'<span class="sample-voice-chip">{chip}</span>' for chip in chips])
+    st.markdown(
+        f"""
+        <div class="sample-voice-mode-card">
+            <div class="sample-voice-mode-icon">{icon}</div>
+            <div class="sample-voice-mode-title">{title}</div>
+            <div class="sample-voice-mode-body">{body}</div>
+            <div class="sample-voice-chip-row">{chip_markup}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def sample_render_voice_bubble(role: str, text: str) -> None:
+    bubble_class = "sample-voice-bubble sample-voice-bubble-user" if role == "user" else "sample-voice-bubble sample-voice-bubble-ai"
+    label = "USER" if role == "user" else "AI REVIEW"
+    st.markdown(
+        f"""
+        <div class="{bubble_class}">
+            <span class="sample-voice-bubble-label">{label}</span>
+            {text}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def sample_render_voice_recorder_card(title: str, caption: str, icon: str = "MIC") -> None:
+    st.markdown(
+        f"""
+        <div class="sample-voice-recorder-card">
+            <div class="sample-voice-recorder-orb">
+                <div class="sample-voice-recorder-ring"></div>
+                <div class="sample-voice-recorder-ring-delay"></div>
+                <div class="sample-voice-recorder-core">{icon}</div>
+            </div>
+            <div class="sample-voice-recorder-title">{title}</div>
+            <div class="sample-voice-recorder-caption">{caption}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # ============================================================
@@ -1563,7 +2125,274 @@ def render_sample_face_auth_popup() -> None:
     if ctx and ctx.state.playing:
         time.sleep(0.35)
         st.rerun()
+@st.dialog("보이스피싱 감지 방식 선택", width="large", dismissible=False)
+def render_sample_voice_mode_selector_popup() -> None:
+    st.markdown('<div class="sample-voice-shell">', unsafe_allow_html=True)
+    st.markdown('<div class="sample-voice-title">어떤 음성 챗봇 화면을 먼저 보시겠어요?</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sample-voice-subtitle">기능은 아직 연결하지 않고, 송금 전 보이스피싱 감지 UX만 검토할 수 있도록 3개 팝업 구조로 정리했습니다. 현재 앱 기준으로는 얼굴 인증 성공 뒤 이 선택 팝업이 이어집니다.</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="sample-voice-chip-row"><span class="sample-voice-chip">Mode Selector</span><span class="sample-voice-chip">Free Chat</span><span class="sample-voice-chip">Turn Based</span></div>',
+        unsafe_allow_html=True,
+    )
 
+    left_col, right_col = st.columns(2)
+    with left_col:
+        sample_render_voice_choice_card(
+            icon="AI",
+            title="자유 대화형",
+            body="통화처럼 자연스럽게 이어지는 대화 로그와 위험 요약 카드가 함께 보이는 구조입니다. 음성 입출력이 붙으면 이 팝업이 가장 풍부한 정보를 담는 메인 화면이 됩니다.",
+            chips=["실시간 로그", "자동 요약", "연속 재생"],
+        )
+        if st.button("자유 대화형 열기", key="sample_voice_selector_free", use_container_width=True):
+            sample_open_voice_free_chat_popup()
+            st.rerun()
+    with right_col:
+        sample_render_voice_choice_card(
+            icon="STEP",
+            title="턴제 대화형",
+            body="사용자 음성 녹음, 다음 스텝 이동, AI 음성 생성과 재생을 단계별로 나눠 보여주는 버전입니다. 처음 보는 사용자에게 더 안전하고 명확한 흐름입니다.",
+            chips=["순차 진행", "재생 버튼", "단계 강조"],
+        )
+        if st.button("턴제 대화형 열기", key="sample_voice_selector_turn", use_container_width=True):
+            sample_open_voice_turn_chat_popup()
+            st.rerun()
+
+    add_vertical_space(1)
+    if st.button("이번에는 닫기", key="sample_voice_selector_close", use_container_width=True):
+        sample_close_voice_chatbot_ui("보이스피싱 감지 챗봇 기능 선택 팝업을 닫았습니다.")
+        st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+@st.dialog("자유 대화형 보이스피싱 감지", width="large", dismissible=False)
+def render_sample_voice_free_chat_popup() -> None:
+    visible_messages = SAMPLE_VOICE_FREE_DEMO_MESSAGES[: st.session_state.sample_voice_free_demo_message_count]
+
+    st.markdown('<div class="sample-voice-shell">', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="sample-ai-review-hero">
+            <div class="sample-ai-review-chip">FREE TALK • Voice Review</div>
+            <div class="sample-ai-review-title">자유롭게 이어지는 음성 대화 UX</div>
+            <div class="sample-ai-review-subtitle">실제 STT, LLM, TTS가 붙으면 이 히어로 영역이 응답 생성 상태와 오디오 재생 애니메이션을 동시에 보여주는 중심 구간이 됩니다.</div>
+            <div class="sample-ai-voice-stage">
+                <div class="sample-ai-orb-wrap">
+                    <div class="sample-ai-orb-ring"></div>
+                    <div class="sample-ai-orb-ring-delay"></div>
+                    <div class="sample-ai-orb-core">AI</div>
+                </div>
+                <div class="sample-ai-eq">
+                    <div class="sample-ai-eq-bar"></div>
+                    <div class="sample-ai-eq-bar"></div>
+                    <div class="sample-ai-eq-bar"></div>
+                    <div class="sample-ai-eq-bar"></div>
+                    <div class="sample-ai-eq-bar"></div>
+                </div>
+                <div class="sample-ai-voice-status">현재 상태: 자유 대화형 시안</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    sample_render_voice_recorder_card(
+        title="음성 입력 자리 표시 영역",
+        caption="실제 기능 연결 전이라 마이크 입력 대신, 음성 입력 위젯이 들어갈 자리와 애니메이션만 먼저 디자인했습니다.",
+        icon="REC",
+    )
+
+    for message in visible_messages:
+        sample_render_voice_bubble(message["role"], message["text"])
+
+    left_summary, right_summary = st.columns(2)
+    with left_summary:
+        st.markdown(
+            """
+            <div class="sample-voice-summary-card">
+                <div class="sample-voice-summary-label">Risk View</div>
+                <div class="sample-voice-summary-value">주의 단계 요약 카드</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with right_summary:
+        st.markdown(
+            f"""
+            <div class="sample-voice-summary-card">
+                <div class="sample-voice-summary-label">Popup Status</div>
+                <div class="sample-voice-summary-value">{st.session_state.sample_voice_free_status_text}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    if st.session_state.sample_voice_free_show_analysis:
+        st.markdown(
+            """
+            <div class="sample-voice-list-card">
+                <div class="sample-voice-list-title">핵심 근거 카드</div>
+                <div class="sample-voice-list-item">• 상대가 먼저 송금을 요구하는 장면을 대화 직후에 바로 노출합니다.</div>
+                <div class="sample-voice-list-item">• 링크 클릭, 앱 설치, 기관 사칭 여부를 하나의 분석 카드로 묶습니다.</div>
+                <div class="sample-voice-list-item">• 실제 서버가 붙으면 턴마다 위험도와 근거 문구가 이 자리를 갱신합니다.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            """
+            <div class="sample-voice-list-card">
+                <div class="sample-voice-list-title">즉시 행동 가이드</div>
+                <div class="sample-voice-list-item">• 송금 보류와 공식 번호 재확인 버튼을 하단 CTA로 고정합니다.</div>
+                <div class="sample-voice-list-item">• 보호자 연락이나 상담 연결 같은 보조 액션도 같은 레벨에서 보여줍니다.</div>
+                <div class="sample-voice-list-item">• 실제 기능이 붙어도 디자인은 이 카드 구성을 유지할 수 있습니다.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    action_col_1, action_col_2, action_col_3 = st.columns(3)
+    with action_col_1:
+        if st.button("예시 대화 더 보기", key="sample_voice_free_more", use_container_width=True):
+            sample_reveal_next_free_demo_message()
+            st.rerun()
+    with action_col_2:
+        if st.button("분석 카드 토글", key="sample_voice_free_toggle", use_container_width=True):
+            st.session_state.sample_voice_free_show_analysis = not st.session_state.sample_voice_free_show_analysis
+            st.rerun()
+    with action_col_3:
+        if st.button("선택 팝업으로", key="sample_voice_free_back", use_container_width=True):
+            sample_open_voice_mode_selector_popup()
+            st.rerun()
+
+    add_vertical_space(1)
+    footer_col_1, footer_col_2 = st.columns(2)
+    with footer_col_1:
+        if st.button("자유 대화형 닫기", key="sample_voice_free_close", use_container_width=True):
+            sample_close_voice_chatbot_ui("자유 대화형 보이스피싱 챗봇 UI 시안을 닫았습니다.")
+            st.rerun()
+    with footer_col_2:
+        if st.button("이 흐름으로 송금 데모 마무리", key="sample_voice_free_finish", use_container_width=True):
+            sample_finish_voice_chatbot_demo("자유 대화형 보이스피싱 챗봇")
+            st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+@st.dialog("턴제 대화형 보이스피싱 감지", width="large", dismissible=False)
+def render_sample_voice_turn_chat_popup() -> None:
+    current_index = int(st.session_state.sample_voice_turn_index)
+    current_turn = SAMPLE_VOICE_TURN_DEMO_FLOW[current_index]
+    current_stage = st.session_state.sample_voice_turn_stage
+    progress_markup = []
+
+    for index, item in enumerate(SAMPLE_VOICE_TURN_DEMO_FLOW):
+        class_name = "sample-turn-progress-item"
+        if index < current_index:
+            class_name += " sample-turn-progress-done"
+        elif index == current_index:
+            if current_stage == "completed":
+                class_name += " sample-turn-progress-done"
+            else:
+                class_name += " sample-turn-progress-active"
+        progress_markup.append(f'<div class="{class_name}">{item["title"]}</div>')
+
+    st.markdown('<div class="sample-voice-shell">', unsafe_allow_html=True)
+    st.markdown('<div class="sample-voice-title">턴제 대화형 UX 시안</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sample-voice-subtitle">사용자 음성 녹음 -> 버튼 클릭 -> LLM 음성 생성 -> 재생 버튼 -> 다음 사용자 녹음 흐름을 시각적으로 점검하는 팝업입니다.</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(f'<div class="sample-turn-progress">{"".join(progress_markup)}</div>', unsafe_allow_html=True)
+
+    if current_stage == "completed":
+        st.markdown(
+            """
+            <div class="sample-turn-complete-card">
+                <div class="sample-face-auth-result-ring"></div>
+                <div class="sample-face-auth-result-ring-delay"></div>
+                <div class="sample-face-auth-result-icon sample-face-auth-result-icon-success">OK</div>
+                <div class="sample-face-auth-result-title">완료 애니메이션 시안</div>
+                <div class="sample-face-auth-result-message">턴제 대화가 끝나면 위험 요약과 다음 행동 안내가 이 화면에서 정리된 뒤 팝업이 닫히는 구성을 가정했습니다.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"""
+            <div class="sample-turn-stage-card">
+                <div class="sample-turn-stage-badge">{sample_get_turn_demo_stage_badge()}</div>
+                <div class="sample-turn-stage-title">{current_turn["title"]}</div>
+                <div class="sample-turn-stage-copy">{current_turn["prompt"]}</div>
+                <div class="sample-turn-stage-copy" style="margin-top:10px; color:#2563eb; font-weight:700;">{st.session_state.sample_voice_turn_hint_text}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        if current_stage == "user_record_ready":
+            sample_render_voice_recorder_card(
+                title="사용자 음성 녹음 UI",
+                caption="첫 단계에서는 사용자가 응답을 남길 마이크 영역을 가장 크게 보여 주는 편이 좋습니다.",
+                icon="REC",
+            )
+        elif current_stage == "server_processing":
+            sample_render_voice_recorder_card(
+                title="LLM 음성 생성 대기 화면",
+                caption="다음 스텝 버튼으로 넘어오면 생성 중 상태를 명확하게 보여 줍니다.",
+                icon="GEN",
+            )
+        elif current_stage == "ai_play_ready":
+            st.markdown(
+                """
+                <div class="sample-turn-audio-card">
+                    <div class="sample-voice-summary-label">Generated Voice</div>
+                    <div class="sample-voice-summary-value">생성된 AI 음성 재생 카드 시안</div>
+                    <div class="sample-turn-audio-wave">
+                        <span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        elif current_stage == "next_ai_ready":
+            st.markdown(
+                """
+                <div class="sample-turn-audio-card">
+                    <div class="sample-voice-summary-label">Next Turn</div>
+                    <div class="sample-voice-summary-value">다음 질문으로 넘어가기 전, 방금 턴의 요약과 다음 행동 버튼이 보이는 영역입니다.</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        if current_stage in {"server_processing", "ai_play_ready", "next_ai_ready"}:
+            sample_render_voice_bubble("user", current_turn["user_example"])
+        if current_stage in {"ai_play_ready", "next_ai_ready"}:
+            sample_render_voice_bubble("assistant", current_turn["assistant_reply"])
+
+    control_col_1, control_col_2, control_col_3 = st.columns(3)
+    with control_col_1:
+        if st.button(sample_get_turn_demo_primary_label(), key="sample_voice_turn_primary", use_container_width=True):
+            if current_stage == "completed":
+                sample_finish_voice_chatbot_demo("턴제 대화형 보이스피싱 챗봇")
+            else:
+                sample_advance_turn_chat_demo()
+            st.rerun()
+    with control_col_2:
+        if st.button("선택 팝업으로", key="sample_voice_turn_back", use_container_width=True):
+            sample_open_voice_mode_selector_popup()
+            st.rerun()
+    with control_col_3:
+        if st.button("턴제형 닫기", key="sample_voice_turn_close", use_container_width=True):
+            sample_close_voice_chatbot_ui("턴제 대화형 보이스피싱 챗봇 UI 시안을 닫았습니다.")
+            st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_sample_amount_screen() -> None:
@@ -1702,6 +2531,12 @@ def main() -> None:
         render_sample_face_registration_dialog()
     if st.session_state.sample_is_face_auth_popup_open:
         render_sample_face_auth_popup()
+    if st.session_state.sample_is_voice_mode_selector_popup_open:
+        render_sample_voice_mode_selector_popup()
+    if st.session_state.sample_is_voice_free_chat_popup_open:
+        render_sample_voice_free_chat_popup()
+    if st.session_state.sample_is_voice_turn_chat_popup_open:
+        render_sample_voice_turn_chat_popup()
 
 
 if __name__ == "__main__":
