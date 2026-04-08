@@ -1,7 +1,11 @@
-import streamlit as st
 import time
+from pathlib import Path
 from typing import Optional
 
+import cv2
+import mediapipe as mp
+import numpy as np
+import streamlit as st
 from streamlit_extras.stylable_container import stylable_container
 from streamlit_extras.colored_header import colored_header
 from streamlit_extras.add_vertical_space import add_vertical_space
@@ -26,6 +30,8 @@ SAMPLE_SCREEN_HOME = "home"
 SAMPLE_SCREEN_RECIPIENT = "recipient"
 SAMPLE_SCREEN_AMOUNT = "amount"
 SAMPLE_HIGH_AMOUNT_AI_THRESHOLD = 10_000_000
+SAMPLE_FACE_REGISTRATION_DIR = Path(__file__).resolve().parent / "data" / "registered_faces"
+SAMPLE_FACE_IMAGE_NAME = "primary_user_face.jpg"
 
 SAMPLE_AVAILABLE_BANK_OPTIONS = [
     "신한은행",
@@ -484,6 +490,40 @@ def inject_sample_global_styles() -> None:
             margin-top: -8px;
         }
 
+        .sample-status-flag {
+            min-height: 48px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.78rem;
+            font-weight: 800;
+            border: 1px solid transparent;
+            letter-spacing: -0.01em;
+        }
+
+        .sample-status-flag-registered {
+            background: rgba(34, 197, 94, 0.10);
+            border-color: rgba(34, 197, 94, 0.18);
+            color: #15803d;
+        }
+
+        .sample-status-flag-unregistered {
+            background: rgba(248, 113, 113, 0.10);
+            border-color: rgba(248, 113, 113, 0.18);
+            color: #b91c1c;
+        }
+
+        .sample-face-help-card {
+            padding: 14px 15px;
+            border-radius: 18px;
+            background: #f8fbff;
+            border: 1px solid #dbeafe;
+            color: #334155;
+            font-size: 0.88rem;
+            line-height: 1.55;
+        }
+
         @media (max-width: 520px) {
             section.main > div {
                 padding-left: 0.4rem;
@@ -503,6 +543,10 @@ def inject_sample_global_styles() -> None:
 # ============================================================
 # State Initialization
 # ============================================================
+def sample_get_registered_face_path() -> Path:
+    return SAMPLE_FACE_REGISTRATION_DIR / SAMPLE_FACE_IMAGE_NAME
+
+
 def initialize_sample_mock_bank_data() -> None:
     if "sample_fake_account_name" not in st.session_state:
         st.session_state.sample_fake_account_name = "SUL 주거래 우대통장"
@@ -532,11 +576,18 @@ def initialize_sample_app_state() -> None:
         "sample_should_auto_advance_from_splash": True,
         "sample_splash_has_advanced": False,
         "sample_is_high_amount_ai_popup_open": False,
+        "sample_is_face_registration_dialog_open": False,
+        "sample_is_face_registered": sample_get_registered_face_path().exists(),
+        "sample_registered_face_path": "",
+        "sample_face_registration_message": "",
+        "sample_face_registration_feedback_type": "",
     }
 
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+
+    sample_refresh_face_registration_state()
 
 
 # ============================================================
@@ -573,6 +624,80 @@ def sample_go_back_from_current_screen() -> None:
     else:
         st.session_state.sample_current_screen = SAMPLE_SCREEN_HOME
     st.rerun()
+
+
+def sample_refresh_face_registration_state() -> None:
+    registered_face_path = sample_get_registered_face_path()
+    is_registered = registered_face_path.exists()
+    st.session_state.sample_is_face_registered = is_registered
+    st.session_state.sample_registered_face_path = str(registered_face_path) if is_registered else ""
+
+
+def sample_set_face_registration_feedback(message: str, feedback_type: str) -> None:
+    st.session_state.sample_face_registration_message = message
+    st.session_state.sample_face_registration_feedback_type = feedback_type
+
+
+def sample_clear_face_registration_camera_state() -> None:
+    if "sample_face_camera_capture" in st.session_state:
+        del st.session_state["sample_face_camera_capture"]
+
+
+def sample_open_face_registration_dialog() -> None:
+    sample_clear_face_registration_camera_state()
+    sample_set_face_registration_feedback("", "")
+    st.session_state.sample_is_face_registration_dialog_open = True
+    st.rerun()
+
+
+def sample_close_face_registration_dialog() -> None:
+    sample_clear_face_registration_camera_state()
+    st.session_state.sample_is_face_registration_dialog_open = False
+    st.rerun()
+
+
+def sample_decode_camera_image(captured_face) -> Optional[np.ndarray]:
+    image_bytes = captured_face.getvalue()
+    if not image_bytes:
+        return None
+
+    image_buffer = np.frombuffer(image_bytes, dtype=np.uint8)
+    return cv2.imdecode(image_buffer, cv2.IMREAD_COLOR)
+
+
+def sample_validate_face_registration_image(image_bgr: Optional[np.ndarray]) -> tuple[bool, str]:
+    if image_bgr is None:
+        return False, "촬영한 이미지를 읽지 못했습니다. 다시 촬영해 주세요."
+
+    image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+    with mp.solutions.face_detection.FaceDetection(
+        model_selection=0,
+        min_detection_confidence=0.5,
+    ) as face_detector:
+        detection_result = face_detector.process(image_rgb)
+
+    detections = detection_result.detections or []
+    if len(detections) == 0:
+        return False, "얼굴이 보이도록 다시 촬영해 주세요."
+    if len(detections) > 1:
+        return False, "한 사람만 화면에 나오도록 다시 촬영해 주세요."
+
+    return True, "얼굴 사진이 등록되었습니다."
+
+
+def sample_register_face_image(captured_face) -> tuple[bool, str]:
+    image_bgr = sample_decode_camera_image(captured_face)
+    is_valid, message = sample_validate_face_registration_image(image_bgr)
+    if not is_valid:
+        return False, message
+
+    registered_face_path = sample_get_registered_face_path()
+    registered_face_path.parent.mkdir(parents=True, exist_ok=True)
+    registered_face_path.write_bytes(captured_face.getvalue())
+    sample_refresh_face_registration_state()
+
+    saved_path = registered_face_path.relative_to(Path(__file__).resolve().parent.parent).as_posix()
+    return True, f"{message} 저장 위치: {saved_path}"
 
 
 # ============================================================
@@ -676,9 +801,30 @@ def render_sample_home_header() -> None:
     with left_col:
         st.markdown('<div><h2 class="sample-brand-text">💶 SUL Bank</h2></div>', unsafe_allow_html=True)
     with center_col:
-        st.button("🔍", key="sample_home_search_button", use_container_width=True, disabled=True)
+        if st.button("📷", key="sample_home_camera_button", use_container_width=True):
+            sample_open_face_registration_dialog()
     with right_col:
-        st.button("🔔", key="sample_home_alert_button", use_container_width=True, disabled=True)
+        is_registered = st.session_state.sample_is_face_registered
+        flag_class_name = "sample-status-flag-registered" if is_registered else "sample-status-flag-unregistered"
+        flag_label = "등록됨" if is_registered else "미등록"
+        st.markdown(
+            f'<div class="sample-status-flag {flag_class_name}">얼굴 {flag_label}</div>',
+            unsafe_allow_html=True,
+        )
+
+
+def render_sample_face_registration_feedback() -> None:
+    message = st.session_state.sample_face_registration_message
+    if not message:
+        return
+
+    feedback_type = st.session_state.sample_face_registration_feedback_type
+    if feedback_type == "success":
+        st.success(message)
+    elif feedback_type == "error":
+        st.error(message)
+    else:
+        st.info(message)
 
 
 def render_sample_section_header(title: str) -> None:
@@ -836,6 +982,7 @@ def render_sample_splash_screen() -> None:
 
 def render_sample_home_screen() -> None:
     render_sample_home_header()
+    render_sample_face_registration_feedback()
     add_vertical_space(1)
 
     colored_header(
@@ -993,6 +1140,50 @@ def render_sample_keypad_button(label: str, button_key: str, on_click_action=Non
         if on_click_action:
             on_click_action()
         st.rerun()
+
+
+@st.dialog("얼굴 등록", width="large")
+def render_sample_face_registration_dialog() -> None:
+    render_sample_face_registration_feedback()
+    st.markdown(
+        """
+        <div class="sample-face-help-card">
+            카메라를 켜고 정면 얼굴을 촬영하면 프로젝트 내부에 실제 이미지가 저장됩니다.
+            저장 전에 얼굴이 1명인지 확인하고, 얼굴이 없거나 여러 명이면 등록하지 않습니다.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    registered_face_path = sample_get_registered_face_path()
+    if st.session_state.sample_is_face_registered and registered_face_path.exists():
+        add_vertical_space(1)
+        st.image(str(registered_face_path), caption="현재 등록된 얼굴 사진", use_container_width=True)
+
+    add_vertical_space(1)
+    captured_face = st.camera_input(
+        "본인 얼굴을 정면으로 촬영하세요.",
+        key="sample_face_camera_capture",
+    )
+
+    if captured_face is None:
+        st.info("촬영 후 등록 버튼을 누르면 사진이 저장됩니다.")
+        if st.button("닫기", key="sample_face_registration_close_idle", use_container_width=True):
+            sample_close_face_registration_dialog()
+        return
+
+    action_col_1, action_col_2 = st.columns(2)
+    with action_col_1:
+        if st.button("이 사진 등록", key="sample_face_registration_confirm", use_container_width=True):
+            is_registered, message = sample_register_face_image(captured_face)
+            feedback_type = "success" if is_registered else "error"
+            sample_set_face_registration_feedback(message, feedback_type)
+            if is_registered:
+                st.session_state.sample_is_face_registration_dialog_open = False
+            st.rerun()
+    with action_col_2:
+        if st.button("닫기", key="sample_face_registration_close_with_capture", use_container_width=True):
+            sample_close_face_registration_dialog()
 
 
 @st.dialog("AI 안심 확인", width="large", dismissible=False)
@@ -1207,6 +1398,8 @@ def main() -> None:
     initialize_sample_app_state()
     format_sample_amount_for_display()
     render_sample_current_screen()
+    if st.session_state.sample_is_face_registration_dialog_open:
+        render_sample_face_registration_dialog()
     if st.session_state.sample_is_high_amount_ai_popup_open:
         render_sample_high_amount_ai_popup()
 
