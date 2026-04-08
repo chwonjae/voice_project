@@ -5,6 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "av>=12.3.0",
+    "mediapipe==0.10.14",
+    "numpy>=1.26.0",
+    "opencv-contrib-python>=4.13.0.92",
+    "opencv-python>=4.10.0.84",
     "elevenlabs>=2.41.0",
     "fastapi[standard]>=0.135.3",
     "generativeai>=0.0.1",
@@ -18,4 +23,5 @@ dependencies = [
     "speechrecognition>=3.16.0",
     "streamlit>=1.56.0",
     "streamlit-extras>=1.3.0",
+    "streamlit-webrtc>=0.47.9"
 ]
