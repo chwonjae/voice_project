@@ -5,10 +5,39 @@ import speech_recognition as sr
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
 from elevenlabs.play import play
+import time
 import os
+
+import winsound
 
 from google import genai
 from google.genai import types
+
+from google.cloud import speech
+
+
+def transcribe_audio_data(audio_data: sr.AudioData) -> speech.RecognizeResponse:
+    client = speech.SpeechClient()
+
+    # speech_recognition의 AudioData를 WAV bytes로 변환
+    wav_bytes = audio_data.get_wav_data(convert_rate=16000, convert_width=2)
+
+    audio = speech.RecognitionAudio(content=wav_bytes)
+
+    config = speech.RecognitionConfig(
+        # WAV 헤더 포함 바이트이므로 encoding은 생략 가능
+        sample_rate_hertz=16000,
+        language_code="ko-KR",
+        enable_automatic_punctuation=True,
+        model="latest_short",
+    )
+
+    response = client.recognize(config=config, audio=audio)
+
+    for result in response.results:
+        print(f"Transcript: {result.alternatives[0].transcript}")
+
+    return response
 
 PhishingType = Literal[
     "수사기관 사칭형-직접 기관 사칭",
@@ -78,7 +107,13 @@ system_instruction_text="""
   - `unknown`은 점수화하지 않는다.
   - 동일 사실은 한 번만 점수화한다. 유형 점수에 이미 반영한 동일 사건은 공통위험에서 중복 가산하지 않는다.
   - 수사기관·은행·공공기관은 사건조회 링크, 특급보안·엠바고, 호텔 격리, 자산검수·안전계좌, 새 휴대전화 개통, 해외 메신저 강요, 경찰·은행원에게 거짓말 지시를 정상 절차로 요구하지 않는다는 전제에서 평가한다.
-
+- STT/ASR robustness rule:
+  - 입력은 실시간 음성 인식 결과이므로 발음 유사어, 띄어쓰기 오류, 조사 탈락, 숫자 오인식, 금융·수사 용어 치환 오류가 포함될 수 있다고 가정한다.
+  - 단어 하나를 문자 그대로 확정하지 말고, 대화 문맥, 앞뒤 발화, 요구 행동, 금전 이동, 앱 설치, 연락 차단, 사칭 주체를 함께 보고 가장 그럴듯한 의미를 복원한다.
+  - 정확한 표면 단어보다 사용자가 실제로 말한 의도와 행동 흐름을 우선한다.
+  - 단, 불확실한 단어 하나만으로 위험 점수를 크게 올리지 않는다.
+  - 문맥상 유력한 해석이 1개로 수렴하면 내부적으로 정규화해 사용하고, 위험 판정이 크게 달라지는 핵심 표현이 여전히 불명확하면 해당 슬롯은 `unknown`으로 두고 다음 턴에 질문 1개로 확인한다.
+  
 # PERSONA & TONE RULE (MUST)
 * 반말을 사용하되 가볍지 않고 안정적인 톤을 유지한다.
 * 말투는 “편하고 다정하지만 판단은 정확한 어른” 느낌으로 유지한다.
@@ -569,6 +604,10 @@ system_instruction_text="""
 
 client = genai.Client()
 
+def play_beep() -> None:
+    # frequency=880Hz, duration=150ms
+    winsound.Beep(880, 150)
+
 cache = client.caches.create(
     model="gemini-3-flash-preview",
     config=types.CreateCachedContentConfig(
@@ -613,19 +652,23 @@ while True:
     
         r.adjust_for_ambient_noise(source)
 
+        print("삐 소리 후 말씀해주세요...")
+        play_beep()
+        time.sleep(0.2)  # 비프음 후 0.2초 뒤 녹음 시작
+
         # STEP1: 마이크 입력 받기
         audio = r.listen(source)
         print("인식 중입니다......")
         
-        user_input = r.recognize_openai(audio) 
+        response = transcribe_audio_data(audio)
+    
+        user_input = " ".join(
+            result.alternatives[0].transcript
+            for result in response.results
+            if result.alternatives
+        ).strip()
+        
         print(f"[USER] {user_input}")
-
-        ############################
-        # 종료 조건
-        ############################
-        if user_input.strip() in ["그만", "종료", "꺼"]:
-            break
-      
 
         # STEP3: LLM 사용자의 입력에 답하기
         answer = chat.send_message(user_input)
