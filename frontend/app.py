@@ -1,8 +1,12 @@
+import base64
+import os
 import time
+from html import escape
 from pathlib import Path
 from typing import Optional
 
 import cv2
+import httpx
 import mediapipe as mp
 import numpy as np
 import streamlit as st
@@ -1099,6 +1103,128 @@ def inject_sample_global_styles() -> None:
             border-color: rgba(34, 197, 94, 0.24);
         }
 
+        .sample-turn-audio-player-card {
+            margin-top: 16px;
+            padding: 16px;
+            border-radius: 20px;
+            background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+            border: 1px solid rgba(37, 99, 235, 0.12);
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.08);
+        }
+
+        .sample-turn-audio-player-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .sample-turn-audio-player-caption {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 0.84rem;
+            line-height: 1.5;
+        }
+
+        .sample-turn-risk-card {
+            margin-top: 14px;
+            padding: 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+        }
+
+        .sample-turn-risk-card-green {
+            background: linear-gradient(180deg, #effdf5 0%, #ffffff 100%);
+            border-color: rgba(34, 197, 94, 0.16);
+        }
+
+        .sample-turn-risk-card-yellow {
+            background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%);
+            border-color: rgba(245, 158, 11, 0.18);
+        }
+
+        .sample-turn-risk-card-orange {
+            background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+            border-color: rgba(249, 115, 22, 0.20);
+        }
+
+        .sample-turn-risk-card-red {
+            background: linear-gradient(180deg, #fef2f2 0%, #ffffff 100%);
+            border-color: rgba(239, 68, 68, 0.22);
+        }
+
+        .sample-turn-risk-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .sample-turn-risk-title {
+            font-size: 0.96rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .sample-turn-risk-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 7px 10px;
+            border-radius: 999px;
+            font-size: 0.74rem;
+            font-weight: 800;
+            color: white;
+        }
+
+        .sample-turn-risk-badge-green { background: #16a34a; }
+        .sample-turn-risk-badge-yellow { background: #d97706; }
+        .sample-turn-risk-badge-orange { background: #ea580c; }
+        .sample-turn-risk-badge-red { background: #dc2626; }
+
+        .sample-turn-risk-score {
+            margin-top: 8px;
+            color: #475569;
+            font-size: 0.84rem;
+        }
+
+        .sample-turn-risk-list {
+            margin-top: 12px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .sample-turn-risk-item {
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.85);
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            color: #334155;
+            font-size: 0.84rem;
+            line-height: 1.5;
+        }
+
+        .sample-turn-loading-card {
+            margin-top: 12px;
+            padding: 14px 15px;
+            border-radius: 18px;
+            background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+            border: 1px solid rgba(37, 99, 235, 0.12);
+        }
+
+        .sample-turn-loading-title {
+            font-size: 0.88rem;
+            font-weight: 800;
+            color: #1d4ed8;
+        }
+
+        .sample-turn-loading-copy {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 0.84rem;
+            line-height: 1.5;
+        }
+
         @keyframes sampleFaceAuthRing {
             0% {
                 transform: scale(0.84);
@@ -1191,13 +1317,26 @@ def initialize_sample_app_state() -> None:
         "sample_is_voice_mode_selector_popup_open": False,
         "sample_is_voice_free_chat_popup_open": False,
         "sample_is_voice_turn_chat_popup_open": False,
+        "sample_is_voice_safe_result_popup_open": False,
+        "sample_is_voice_risk_result_popup_open": False,
         "sample_voice_selected_mode": "",
+        "sample_voice_selector_notice": "",
         "sample_voice_free_demo_message_count": 3,
         "sample_voice_free_show_analysis": True,
         "sample_voice_free_status_text": "대화 대기",
         "sample_voice_turn_stage": "opening_ready",
         "sample_voice_turn_index": 0,
         "sample_voice_turn_hint_text": "사용자 음성을 먼저 받는 턴제 흐름을 시각적으로 확인하는 단계입니다.",
+        "sample_voice_turn_status_text": "첫 질문을 준비하고 있습니다.",
+        "sample_voice_turn_session_id": "",
+        "sample_voice_turn_history": [],
+        "sample_voice_turn_latest_audio_base64": "",
+        "sample_voice_turn_latest_result": None,
+        "sample_voice_turn_is_processing": False,
+        "sample_voice_turn_terminal_state": "",
+        "sample_voice_turn_error_message": "",
+        "sample_voice_turn_result_auto_close_at": 0.0,
+        "sample_voice_turn_recorder_nonce": 0,
     }
 
     for key, value in defaults.items():
@@ -1384,13 +1523,153 @@ def sample_reset_voice_chatbot_ui_state() -> None:
     st.session_state.sample_is_voice_mode_selector_popup_open = False
     st.session_state.sample_is_voice_free_chat_popup_open = False
     st.session_state.sample_is_voice_turn_chat_popup_open = False
+    st.session_state.sample_is_voice_safe_result_popup_open = False
+    st.session_state.sample_is_voice_risk_result_popup_open = False
     st.session_state.sample_voice_selected_mode = ""
+    st.session_state.sample_voice_selector_notice = ""
     st.session_state.sample_voice_free_demo_message_count = 3
     st.session_state.sample_voice_free_show_analysis = True
     st.session_state.sample_voice_free_status_text = "대화 대기"
     st.session_state.sample_voice_turn_stage = "opening_ready"
     st.session_state.sample_voice_turn_index = 0
     st.session_state.sample_voice_turn_hint_text = "사용자 음성을 먼저 받는 턴제 흐름을 시각적으로 확인하는 단계입니다."
+    st.session_state.sample_voice_turn_status_text = "첫 질문을 준비하고 있습니다."
+    st.session_state.sample_voice_turn_session_id = ""
+    st.session_state.sample_voice_turn_history = []
+    st.session_state.sample_voice_turn_latest_audio_base64 = ""
+    st.session_state.sample_voice_turn_latest_result = None
+    st.session_state.sample_voice_turn_is_processing = False
+    st.session_state.sample_voice_turn_terminal_state = ""
+    st.session_state.sample_voice_turn_error_message = ""
+    st.session_state.sample_voice_turn_result_auto_close_at = 0.0
+    st.session_state.sample_voice_turn_recorder_nonce = 0
+
+
+def sample_get_voice_backend_base_url() -> str:
+    return os.getenv("VOICE_PHISHING_API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+
+
+def sample_raise_voice_backend_error(exc: Exception) -> RuntimeError:
+    if isinstance(exc, httpx.HTTPStatusError):
+        try:
+            detail = exc.response.json().get("detail", exc.response.text)
+        except ValueError:
+            detail = exc.response.text
+        return RuntimeError(detail or "백엔드 요청에 실패했습니다.")
+    if isinstance(exc, httpx.HTTPError):
+        return RuntimeError("보이스피싱 백엔드와 연결하지 못했습니다.")
+    return RuntimeError(str(exc))
+
+
+def sample_create_turn_voice_session() -> dict:
+    try:
+        with httpx.Client(base_url=sample_get_voice_backend_base_url(), timeout=90.0) as client:
+            response = client.post("/voice-phishing/turn/sessions")
+            response.raise_for_status()
+            return response.json()
+    except Exception as exc:
+        raise sample_raise_voice_backend_error(exc) from exc
+
+
+def sample_send_turn_voice_reply(session_id: str, audio_file) -> dict:
+    audio_bytes = audio_file.getvalue()
+    content_type = audio_file.type or "audio/wav"
+    files = {
+        "audio_file": (
+            audio_file.name or f"turn_reply_{int(time.time())}.wav",
+            audio_bytes,
+            content_type,
+        )
+    }
+    try:
+        with httpx.Client(base_url=sample_get_voice_backend_base_url(), timeout=180.0) as client:
+            response = client.post(f"/voice-phishing/turn/sessions/{session_id}/reply", files=files)
+            response.raise_for_status()
+            return response.json()
+    except Exception as exc:
+        raise sample_raise_voice_backend_error(exc) from exc
+
+
+def sample_delete_turn_voice_session(silent: bool = True) -> None:
+    session_id = str(st.session_state.sample_voice_turn_session_id or "")
+    if not session_id:
+        return
+
+    st.session_state.sample_voice_turn_session_id = ""
+    try:
+        with httpx.Client(base_url=sample_get_voice_backend_base_url(), timeout=15.0) as client:
+            client.delete(f"/voice-phishing/turn/sessions/{session_id}")
+    except Exception:
+        if not silent:
+            raise
+
+
+def sample_decode_voice_audio(audio_base64: str) -> bytes:
+    if not audio_base64:
+        return b""
+    try:
+        return base64.b64decode(audio_base64)
+    except Exception:
+        return b""
+
+
+def sample_get_latest_turn_assistant_message() -> str:
+    history = st.session_state.sample_voice_turn_history
+    for item in reversed(history):
+        if item.get("role") == "assistant":
+            return str(item.get("text", ""))
+    return ""
+
+
+def sample_bootstrap_turn_voice_session() -> None:
+    payload = sample_create_turn_voice_session()
+    st.session_state.sample_voice_turn_session_id = payload["session_id"]
+    st.session_state.sample_voice_turn_history = [
+        {"role": "assistant", "text": payload["intro_message"]}
+    ]
+    st.session_state.sample_voice_turn_latest_audio_base64 = payload.get("intro_audio_base64", "")
+    st.session_state.sample_voice_turn_latest_result = {
+        "risk_level": payload.get("risk_level", "낮음"),
+        "risk_score": payload.get("risk_score", 0),
+        "suspected_types": payload.get("suspected_types", []),
+        "key_evidence": payload.get("key_evidence", []),
+        "immediate_action": payload.get("immediate_action", []),
+        "conversation_status": payload.get("conversation_status", "in_progress"),
+        "termination_reason": None,
+        "system_message": payload.get("intro_message", ""),
+    }
+    st.session_state.sample_voice_turn_stage = "user_record_ready"
+    st.session_state.sample_voice_turn_status_text = "질문을 들은 뒤 답변을 녹음해 주세요."
+    st.session_state.sample_voice_turn_error_message = ""
+
+
+def sample_transition_turn_voice_terminal_state(termination_reason: str | None) -> None:
+    st.session_state.sample_is_voice_turn_chat_popup_open = False
+    st.session_state.sample_voice_turn_terminal_state = termination_reason or ""
+    if termination_reason == "safe_confirmed":
+        st.session_state.sample_is_voice_safe_result_popup_open = True
+        st.session_state.sample_voice_turn_result_auto_close_at = time.time() + 1.8
+    else:
+        st.session_state.sample_is_voice_risk_result_popup_open = True
+
+
+def sample_apply_turn_voice_reply(payload: dict) -> None:
+    history = list(st.session_state.sample_voice_turn_history)
+    history.append({"role": "user", "text": payload["user_transcript"]})
+    history.append({"role": "assistant", "text": payload["system_message"]})
+    st.session_state.sample_voice_turn_history = history
+    st.session_state.sample_voice_turn_latest_audio_base64 = payload.get("audio_base64", "")
+    st.session_state.sample_voice_turn_latest_result = payload
+    st.session_state.sample_voice_turn_error_message = ""
+    st.session_state.sample_voice_turn_recorder_nonce += 1
+
+    if payload.get("conversation_status") == "terminated":
+        st.session_state.sample_voice_turn_status_text = "최종 결과를 정리하고 있습니다."
+        sample_transition_turn_voice_terminal_state(payload.get("termination_reason"))
+        return
+
+    st.session_state.sample_voice_turn_stage = "user_record_ready"
+    st.session_state.sample_voice_turn_status_text = "다음 질문이 준비됐어요. 답변을 녹음해 주세요."
 
 
 def sample_open_voice_mode_selector_popup() -> None:
@@ -1409,11 +1688,14 @@ def sample_open_voice_turn_chat_popup() -> None:
     sample_reset_voice_chatbot_ui_state()
     st.session_state.sample_voice_selected_mode = SAMPLE_VOICE_MODE_TURN
     st.session_state.sample_is_voice_turn_chat_popup_open = True
-    st.session_state.sample_voice_turn_stage = "user_record_ready"
-    st.session_state.sample_voice_turn_hint_text = "첫 번째 사용자 녹음 카드가 준비되었습니다."
+    st.session_state.sample_voice_turn_stage = "booting"
+    st.session_state.sample_voice_turn_status_text = "첫 질문을 준비하고 있습니다."
+    st.session_state.sample_voice_turn_hint_text = "턴제 대화형 세션을 시작하는 중입니다."
 
 
-def sample_close_voice_chatbot_ui(message: str = "") -> None:
+def sample_close_voice_chatbot_ui(message: str = "", cleanup_session: bool = True) -> None:
+    if cleanup_session:
+        sample_delete_turn_voice_session(silent=True)
     sample_reset_voice_chatbot_ui_state()
     if message:
         st.session_state.sample_recent_action_message = message
@@ -1509,11 +1791,12 @@ def sample_render_voice_choice_card(icon: str, title: str, body: str, chips: lis
 def sample_render_voice_bubble(role: str, text: str) -> None:
     bubble_class = "sample-voice-bubble sample-voice-bubble-user" if role == "user" else "sample-voice-bubble sample-voice-bubble-ai"
     label = "USER" if role == "user" else "AI REVIEW"
+    safe_text = escape(text).replace("\n", "<br/>")
     st.markdown(
         f"""
         <div class="{bubble_class}">
             <span class="sample-voice-bubble-label">{label}</span>
-            {text}
+            {safe_text}
         </div>
         """,
         unsafe_allow_html=True,
@@ -1531,6 +1814,70 @@ def sample_render_voice_recorder_card(title: str, caption: str, icon: str = "MIC
             </div>
             <div class="sample-voice-recorder-title">{title}</div>
             <div class="sample-voice-recorder-caption">{caption}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def sample_get_risk_theme(latest_result: Optional[dict]) -> dict[str, str]:
+    risk_score = int((latest_result or {}).get("risk_score", 0) or 0)
+    if risk_score >= 60:
+        return {"card": "sample-turn-risk-card-red", "badge": "sample-turn-risk-badge-red", "label": "고위험"}
+    if risk_score >= 45:
+        return {"card": "sample-turn-risk-card-orange", "badge": "sample-turn-risk-badge-orange", "label": "높음"}
+    if risk_score >= 25:
+        return {"card": "sample-turn-risk-card-yellow", "badge": "sample-turn-risk-badge-yellow", "label": "주의"}
+    return {"card": "sample-turn-risk-card-green", "badge": "sample-turn-risk-badge-green", "label": "낮음"}
+
+
+def sample_render_turn_audio_player(title: str, caption: str, audio_bytes: bytes, message_text: str) -> None:
+    st.markdown(
+        f"""
+        <div class="sample-turn-audio-player-card">
+            <div class="sample-turn-audio-player-title">{escape(title)}</div>
+            <div class="sample-turn-audio-player-caption">{escape(caption)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if audio_bytes:
+        st.audio(audio_bytes, format="audio/mp3")
+    else:
+        st.info("재생할 음성이 아직 준비되지 않았습니다.")
+    if message_text:
+        st.caption(message_text)
+
+
+def sample_render_turn_risk_panel(latest_result: Optional[dict]) -> None:
+    latest_result = latest_result or {}
+    theme = sample_get_risk_theme(latest_result)
+    risk_label = latest_result.get("risk_level", "낮음")
+    risk_score = int(latest_result.get("risk_score", 0) or 0)
+    suspected_types = latest_result.get("suspected_types", []) or []
+    key_evidence = latest_result.get("key_evidence", []) or []
+
+    suspected_items = "".join(
+        [
+            f'<div class="sample-turn-risk-item">{escape(item.get("type", ""))} · {int(item.get("score", 0) or 0)}점</div>'
+            for item in suspected_types
+        ]
+    ) or '<div class="sample-turn-risk-item">아직 특정 수법이 좁혀지지 않았습니다.</div>'
+
+    evidence_items = "".join(
+        [f'<div class="sample-turn-risk-item">{escape(str(item))}</div>' for item in key_evidence]
+    ) or '<div class="sample-turn-risk-item">첫 답변을 분석하면 핵심 근거가 여기에 표시됩니다.</div>'
+
+    st.markdown(
+        f"""
+        <div class="sample-turn-risk-card {theme["card"]}">
+            <div class="sample-turn-risk-header">
+                <div class="sample-turn-risk-title">현재 위험도와 예상 수법</div>
+                <div class="sample-turn-risk-badge {theme["badge"]}">{escape(str(risk_label))}</div>
+            </div>
+            <div class="sample-turn-risk-score">위험 점수 {risk_score}점 · 상태 {theme["label"]}</div>
+            <div class="sample-turn-risk-list">{suspected_items}</div>
+            <div class="sample-turn-risk-list">{evidence_items}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -2128,9 +2475,9 @@ def render_sample_face_auth_popup() -> None:
 @st.dialog("보이스피싱 감지 방식 선택", width="large", dismissible=False)
 def render_sample_voice_mode_selector_popup() -> None:
     st.markdown('<div class="sample-voice-shell">', unsafe_allow_html=True)
-    st.markdown('<div class="sample-voice-title">어떤 음성 챗봇 화면을 먼저 보시겠어요?</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sample-voice-title">송금 전 음성 확인 방식을 선택해 주세요</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="sample-voice-subtitle">기능은 아직 연결하지 않고, 송금 전 보이스피싱 감지 UX만 검토할 수 있도록 3개 팝업 구조로 정리했습니다. 현재 앱 기준으로는 얼굴 인증 성공 뒤 이 선택 팝업이 이어집니다.</div>',
+        '<div class="sample-voice-subtitle">얼굴 인증이 끝나면 이 팝업에서 음성 확인 방식을 고릅니다. 이번 1차에서는 턴제 대화형만 실제 기능으로 연결하고, 자유 대화형은 다음 단계에서 이어집니다.</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -2143,11 +2490,11 @@ def render_sample_voice_mode_selector_popup() -> None:
         sample_render_voice_choice_card(
             icon="AI",
             title="자유 대화형",
-            body="통화처럼 자연스럽게 이어지는 대화 로그와 위험 요약 카드가 함께 보이는 구조입니다. 음성 입출력이 붙으면 이 팝업이 가장 풍부한 정보를 담는 메인 화면이 됩니다.",
+            body="통화처럼 자연스럽게 이어지는 대화 로그와 위험 요약 카드가 함께 보이는 구조입니다. 이번 단계에서는 UI만 남겨 두고, 다음 구현에서 기능을 연결합니다.",
             chips=["실시간 로그", "자동 요약", "연속 재생"],
         )
         if st.button("자유 대화형 열기", key="sample_voice_selector_free", use_container_width=True):
-            sample_open_voice_free_chat_popup()
+            st.session_state.sample_voice_selector_notice = "자유 대화형은 다음 단계에서 연결할 예정입니다. 이번에는 턴제 대화형을 먼저 사용해 주세요."
             st.rerun()
     with right_col:
         sample_render_voice_choice_card(
@@ -2159,6 +2506,9 @@ def render_sample_voice_mode_selector_popup() -> None:
         if st.button("턴제 대화형 열기", key="sample_voice_selector_turn", use_container_width=True):
             sample_open_voice_turn_chat_popup()
             st.rerun()
+
+    if st.session_state.sample_voice_selector_notice:
+        st.info(st.session_state.sample_voice_selector_notice)
 
     add_vertical_space(1)
     if st.button("이번에는 닫기", key="sample_voice_selector_close", use_container_width=True):
@@ -2284,113 +2634,256 @@ def render_sample_voice_free_chat_popup() -> None:
 
 @st.dialog("턴제 대화형 보이스피싱 감지", width="large", dismissible=False)
 def render_sample_voice_turn_chat_popup() -> None:
-    current_index = int(st.session_state.sample_voice_turn_index)
-    current_turn = SAMPLE_VOICE_TURN_DEMO_FLOW[current_index]
-    current_stage = st.session_state.sample_voice_turn_stage
-    progress_markup = []
+    if (
+        not st.session_state.sample_voice_turn_session_id
+        and not st.session_state.sample_voice_turn_error_message
+    ):
+        with st.spinner("첫 질문과 음성을 준비하고 있습니다..."):
+            try:
+                sample_bootstrap_turn_voice_session()
+            except RuntimeError as exc:
+                st.session_state.sample_voice_turn_stage = "error"
+                st.session_state.sample_voice_turn_error_message = str(exc)
+        st.rerun()
+        return
 
-    for index, item in enumerate(SAMPLE_VOICE_TURN_DEMO_FLOW):
-        class_name = "sample-turn-progress-item"
-        if index < current_index:
-            class_name += " sample-turn-progress-done"
-        elif index == current_index:
-            if current_stage == "completed":
-                class_name += " sample-turn-progress-done"
-            else:
-                class_name += " sample-turn-progress-active"
-        progress_markup.append(f'<div class="{class_name}">{item["title"]}</div>')
+    if not st.session_state.sample_voice_turn_session_id:
+        st.markdown('<div class="sample-voice-shell">', unsafe_allow_html=True)
+        st.markdown('<div class="sample-voice-title">턴제 대화형 보이스피싱 감지</div>', unsafe_allow_html=True)
+        st.error(st.session_state.sample_voice_turn_error_message or "대화 세션을 시작하지 못했습니다.")
+        retry_col, back_col = st.columns(2)
+        with retry_col:
+            if st.button("다시 시도", key="sample_voice_turn_retry_bootstrap", use_container_width=True):
+                st.session_state.sample_voice_turn_error_message = ""
+                st.session_state.sample_voice_turn_status_text = "첫 질문을 다시 준비하고 있습니다."
+                st.rerun()
+        with back_col:
+            if st.button("선택 팝업으로", key="sample_voice_turn_bootstrap_back", use_container_width=True):
+                sample_open_voice_mode_selector_popup()
+                st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        return
+
+    latest_result = st.session_state.sample_voice_turn_latest_result or {}
+    latest_audio_bytes = sample_decode_voice_audio(
+        st.session_state.sample_voice_turn_latest_audio_base64
+    )
+    latest_message = sample_get_latest_turn_assistant_message()
+    recorder_key = f"sample_voice_turn_audio_input_{st.session_state.sample_voice_turn_recorder_nonce}"
 
     st.markdown('<div class="sample-voice-shell">', unsafe_allow_html=True)
-    st.markdown('<div class="sample-voice-title">턴제 대화형 UX 시안</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sample-voice-title">턴제 대화형 보이스피싱 감지</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="sample-voice-subtitle">사용자 음성 녹음 -> 버튼 클릭 -> LLM 음성 생성 -> 재생 버튼 -> 다음 사용자 녹음 흐름을 시각적으로 점검하는 팝업입니다.</div>',
+        '<div class="sample-voice-subtitle">질문 음성을 먼저 듣고, 답변을 녹음한 뒤 전송하면 다음 질문과 위험도가 갱신됩니다.</div>',
         unsafe_allow_html=True,
     )
-    st.markdown(f'<div class="sample-turn-progress">{"".join(progress_markup)}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class="sample-turn-loading-card">
+            <div class="sample-turn-loading-title">현재 단계</div>
+            <div class="sample-turn-loading-copy">{escape(st.session_state.sample_voice_turn_status_text)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    if current_stage == "completed":
-        st.markdown(
-            """
-            <div class="sample-turn-complete-card">
-                <div class="sample-face-auth-result-ring"></div>
-                <div class="sample-face-auth-result-ring-delay"></div>
-                <div class="sample-face-auth-result-icon sample-face-auth-result-icon-success">OK</div>
-                <div class="sample-face-auth-result-title">완료 애니메이션 시안</div>
-                <div class="sample-face-auth-result-message">턴제 대화가 끝나면 위험 요약과 다음 행동 안내가 이 화면에서 정리된 뒤 팝업이 닫히는 구성을 가정했습니다.</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+    if st.session_state.sample_voice_turn_error_message:
+        st.error(st.session_state.sample_voice_turn_error_message)
+
+    with stylable_container(
+        key="sample_turn_audio_player_block",
+        css_styles="""
+            {
+                margin-top: 8px;
+            }
+        """,
+    ):
+        sample_render_turn_audio_player(
+            title="챗봇 질문 재생",
+            caption="상단 플레이어에서 현재 질문을 재생할 수 있습니다.",
+            audio_bytes=latest_audio_bytes,
+            message_text=latest_message,
         )
-    else:
-        st.markdown(
-            f"""
-            <div class="sample-turn-stage-card">
-                <div class="sample-turn-stage-badge">{sample_get_turn_demo_stage_badge()}</div>
-                <div class="sample-turn-stage-title">{current_turn["title"]}</div>
-                <div class="sample-turn-stage-copy">{current_turn["prompt"]}</div>
-                <div class="sample-turn-stage-copy" style="margin-top:10px; color:#2563eb; font-weight:700;">{st.session_state.sample_voice_turn_hint_text}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+
+    with stylable_container(
+        key="sample_turn_audio_record_block",
+        css_styles="""
+            {
+                margin-top: 8px;
+                padding: 16px;
+                border-radius: 20px;
+                background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+                border: 1px solid rgba(37, 99, 235, 0.10);
+                box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+            }
+        """,
+    ):
+        st.markdown("**답변 녹음**")
+        st.caption("녹음을 마친 뒤 `답변 보내기`를 누르면 다음 질문을 준비합니다.")
+        recorded_audio = st.audio_input(
+            "사용자 음성 녹음",
+            key=recorder_key,
+            disabled=st.session_state.sample_voice_turn_is_processing,
         )
-
-        if current_stage == "user_record_ready":
-            sample_render_voice_recorder_card(
-                title="사용자 음성 녹음 UI",
-                caption="첫 단계에서는 사용자가 응답을 남길 마이크 영역을 가장 크게 보여 주는 편이 좋습니다.",
-                icon="REC",
-            )
-        elif current_stage == "server_processing":
-            sample_render_voice_recorder_card(
-                title="LLM 음성 생성 대기 화면",
-                caption="다음 스텝 버튼으로 넘어오면 생성 중 상태를 명확하게 보여 줍니다.",
-                icon="GEN",
-            )
-        elif current_stage == "ai_play_ready":
-            st.markdown(
-                """
-                <div class="sample-turn-audio-card">
-                    <div class="sample-voice-summary-label">Generated Voice</div>
-                    <div class="sample-voice-summary-value">생성된 AI 음성 재생 카드 시안</div>
-                    <div class="sample-turn-audio-wave">
-                        <span></span><span></span><span></span><span></span><span></span>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        elif current_stage == "next_ai_ready":
-            st.markdown(
-                """
-                <div class="sample-turn-audio-card">
-                    <div class="sample-voice-summary-label">Next Turn</div>
-                    <div class="sample-voice-summary-value">다음 질문으로 넘어가기 전, 방금 턴의 요약과 다음 행동 버튼이 보이는 영역입니다.</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        if current_stage in {"server_processing", "ai_play_ready", "next_ai_ready"}:
-            sample_render_voice_bubble("user", current_turn["user_example"])
-        if current_stage in {"ai_play_ready", "next_ai_ready"}:
-            sample_render_voice_bubble("assistant", current_turn["assistant_reply"])
-
-    control_col_1, control_col_2, control_col_3 = st.columns(3)
-    with control_col_1:
-        if st.button(sample_get_turn_demo_primary_label(), key="sample_voice_turn_primary", use_container_width=True):
-            if current_stage == "completed":
-                sample_finish_voice_chatbot_demo("턴제 대화형 보이스피싱 챗봇")
+        if st.button(
+            "답변 보내기",
+            key="sample_voice_turn_submit",
+            use_container_width=True,
+            disabled=st.session_state.sample_voice_turn_is_processing,
+        ):
+            if recorded_audio is None:
+                st.warning("먼저 답변을 녹음해 주세요.")
             else:
-                sample_advance_turn_chat_demo()
-            st.rerun()
-    with control_col_2:
+                st.session_state.sample_voice_turn_is_processing = True
+                st.session_state.sample_voice_turn_stage = "processing"
+                st.session_state.sample_voice_turn_status_text = "답변을 분석하고 다음 질문을 준비하고 있습니다."
+                try:
+                    with st.status("응답을 준비하고 있어요...", expanded=True) as status_box:
+                        status_box.write("음성을 업로드하고 있습니다.")
+                        reply_payload = sample_send_turn_voice_reply(
+                            st.session_state.sample_voice_turn_session_id,
+                            recorded_audio,
+                        )
+                        status_box.write("STT와 위험도 분석을 정리하고 있습니다.")
+                        status_box.write("챗봇 음성을 생성하고 있습니다.")
+                        status_box.update(label="다음 질문 준비 완료", state="complete")
+                    sample_apply_turn_voice_reply(reply_payload)
+                except RuntimeError as exc:
+                    st.session_state.sample_voice_turn_stage = "user_record_ready"
+                    st.session_state.sample_voice_turn_status_text = "오류가 발생했습니다. 다시 녹음해 주세요."
+                    st.session_state.sample_voice_turn_error_message = str(exc)
+                finally:
+                    st.session_state.sample_voice_turn_is_processing = False
+                st.rerun()
+
+    with stylable_container(
+        key="sample_turn_history_block",
+        css_styles="""
+            {
+                margin-top: 8px;
+                padding: 16px;
+                border-radius: 20px;
+                background: rgba(255,255,255,0.96);
+                border: 1px solid rgba(15, 23, 42, 0.06);
+                box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+            }
+        """,
+    ):
+        st.markdown("**대화 기록**")
+        history = st.session_state.sample_voice_turn_history
+        if history:
+            for item in history:
+                sample_render_voice_bubble(item["role"], item["text"])
+        else:
+            st.info("첫 질문이 준비되면 대화 기록이 표시됩니다.")
+
+    sample_render_turn_risk_panel(latest_result)
+
+    button_col_1, button_col_2 = st.columns(2)
+    with button_col_1:
         if st.button("선택 팝업으로", key="sample_voice_turn_back", use_container_width=True):
+            sample_close_voice_chatbot_ui(cleanup_session=True)
             sample_open_voice_mode_selector_popup()
             st.rerun()
-    with control_col_3:
+    with button_col_2:
         if st.button("턴제형 닫기", key="sample_voice_turn_close", use_container_width=True):
-            sample_close_voice_chatbot_ui("턴제 대화형 보이스피싱 챗봇 UI 시안을 닫았습니다.")
+            sample_close_voice_chatbot_ui("턴제 대화형 보이스피싱 감지를 닫았습니다.")
             st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+@st.dialog("송금 확인 완료", width="large", dismissible=False)
+def render_sample_voice_safe_result_popup() -> None:
+    latest_result = st.session_state.sample_voice_turn_latest_result or {}
+    st.markdown('<div class="sample-voice-shell">', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="sample-turn-complete-card">
+            <div class="sample-face-auth-result-ring"></div>
+            <div class="sample-face-auth-result-ring-delay"></div>
+            <div class="sample-face-auth-result-icon sample-face-auth-result-icon-success">OK</div>
+            <div class="sample-face-auth-result-title">안전하게 확인되었습니다</div>
+            <div class="sample-face-auth-result-message">마지막 안내를 확인한 뒤 송금을 이어서 진행합니다.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if latest_result.get("key_evidence"):
+        st.markdown("**확인 근거**")
+        for item in latest_result.get("key_evidence", []):
+            st.markdown(f"- {item}")
+    if latest_result.get("immediate_action"):
+        st.markdown("**안내된 행동**")
+        for item in latest_result.get("immediate_action", []):
+            st.markdown(f"- {item}")
+
+    if time.time() >= float(st.session_state.sample_voice_turn_result_auto_close_at or 0.0):
+        response = sample_submit_mock_transfer_request()
+        sample_close_voice_chatbot_ui(
+            f"보이스피싱 위험이 낮아 송금을 이어서 진행했습니다. {response['message']}"
+        )
+        st.rerun()
+        return
+
+    st.caption("잠시 후 송금 완료 상태로 이동합니다.")
+    time.sleep(0.35)
+    st.rerun()
+
+
+@st.dialog("위험 감지 결과", width="large", dismissible=False)
+def render_sample_voice_risk_result_popup() -> None:
+    latest_result = st.session_state.sample_voice_turn_latest_result or {}
+    latest_audio_bytes = sample_decode_voice_audio(
+        st.session_state.sample_voice_turn_latest_audio_base64
+    )
+
+    st.markdown('<div class="sample-voice-shell">', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="sample-turn-complete-card" style="background: linear-gradient(180deg, #fff5f5 0%, #ffffff 100%); border-color: rgba(239, 68, 68, 0.18);">
+            <div class="sample-face-auth-result-ring"></div>
+            <div class="sample-face-auth-result-ring-delay"></div>
+            <div class="sample-face-auth-result-icon sample-face-auth-result-icon-failed">!</div>
+            <div class="sample-face-auth-result-title">위험 신호가 감지되었습니다</div>
+            <div class="sample-face-auth-result-message">송금은 차단된 상태입니다. 마지막 안내 음성과 즉시 행동 가이드를 확인해 주세요.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    sample_render_turn_audio_player(
+        title="마지막 안내 음성",
+        caption="종료 시점의 마지막 안내를 다시 들을 수 있습니다.",
+        audio_bytes=latest_audio_bytes,
+        message_text=str(latest_result.get("system_message", "")),
+    )
+    sample_render_turn_risk_panel(latest_result)
+
+    with stylable_container(
+        key="sample_turn_risk_action_block",
+        css_styles="""
+            {
+                margin-top: 8px;
+                padding: 16px;
+                border-radius: 20px;
+                background: rgba(255,255,255,0.96);
+                border: 1px solid rgba(15, 23, 42, 0.06);
+                box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+            }
+        """,
+    ):
+        st.markdown("**즉시 행동 가이드**")
+        immediate_actions = latest_result.get("immediate_action", []) or []
+        if immediate_actions:
+            for item in immediate_actions:
+                st.markdown(f"- {item}")
+        else:
+            st.markdown("- 지금은 송금을 멈추고 공식 채널로 다시 확인해 주세요.")
+
+    if st.button("송금 취소하고 돌아가기", key="sample_voice_risk_close", use_container_width=True):
+        sample_close_voice_chatbot_ui("위험이 감지되어 이번 송금을 차단했습니다.")
+        st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -2537,6 +3030,10 @@ def main() -> None:
         render_sample_voice_free_chat_popup()
     if st.session_state.sample_is_voice_turn_chat_popup_open:
         render_sample_voice_turn_chat_popup()
+    if st.session_state.sample_is_voice_safe_result_popup_open:
+        render_sample_voice_safe_result_popup()
+    if st.session_state.sample_is_voice_risk_result_popup_open:
+        render_sample_voice_risk_result_popup()
 
 
 if __name__ == "__main__":
